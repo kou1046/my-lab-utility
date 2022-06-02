@@ -1,3 +1,4 @@
+from cmath import sin
 import numpy as np 
 import matplotlib.pyplot as plt
 from matplotlib.animation import ArtistAnimation
@@ -9,7 +10,7 @@ def STFT(array:np.ndarray,window_size:int,step:int,window_func=np.hamming) -> np
     for i in range((len(array) - window_size) // step):
         tmp = array[i*step:i*step + window_size]
         tmp = tmp * window_func(window_size)    
-        amp = ((abs(dft(tmp)))**2)[:window_size // 2 + 1]
+        amp = ((abs(DFT(tmp)))**2)[:window_size // 2 + 1]
         result.append(amp)
     return np.array(result)
 
@@ -44,16 +45,22 @@ def my_get_peakindex(array,num:int) -> np.ndarray:
         cnt = cnt + 1
     return np.array(result)
 
-def convolve(f,g,animation_axes=None):
+def convolve(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',animation_axes=None):
+    if mode not in ['full','right','valid']:
+        raise ValueError('error')
+    if animation_axes is not None:
+        animation_axes[0].plot(times,f,'black')
     f_N = len(f)
     g_N = len(g)
+    lag_times = np.array(list(reversed(-1*times[1:g_N])) + list(times)) if mode == 'full' else times
+    range_ = range(f_N + g_N - 2) if mode  == 'full' else range(g_N-1,f_N+g_N - 2) if mode =='right' else range(g_N-1,f_N-1)
     result = []
     img_list = []
     is_move = False
-    move = 0
-    if animation_axes is not None:
-        animation_axes[0].plot(f,'black')
-    for tau in range(f_N + g_N):
+    move = 0 
+    for tau in range_:
+        if tau == f_N+g_N - 1:
+            print('')
         if tau < g_N - 1 :
             tmp_f = f[:tau+1]
             tmp_g = g[(g_N-1)-tau:]
@@ -66,44 +73,65 @@ def convolve(f,g,animation_axes=None):
             tmp_g = g[:len(tmp_f)]
         result.append(np.sum(tmp_f * tmp_g))
         if animation_axes is not None:
-            im = animation_axes[0].plot(list([*[np.nan]*move]) + list(tmp_f) , 'blue')
-            im_2 = animation_axes[0].plot(list([*[np.nan]*move]) + list(tmp_g),'red')
-            im_3 = animation_axes[1].plot(result,'black')
-            img_list.append(im+im_2+im_3)
+            tmp_t = times[:tau+1]
+            y_1 = list([*[np.nan]*move]) + list(tmp_f)
+            y_2 = list([*[np.nan]*move]) + list(tmp_g)
+            im = animation_axes[0].plot(tmp_t,y_1, 'blue')
+            im_2 = animation_axes[0].plot(tmp_t,y_2,'red')
+            lag_title = animation_axes[0].text(0.5, 1.01, f'tau = {tau-(g_N-1)}',ha='center', va='bottom',transform=animation_axes[0].transAxes, fontsize='large')
+            im_3 = animation_axes[1].plot(lag_times[:len(result)],result,'black')
+            img_list.append(im+im_2+im_3 + [lag_title])
         if is_move :
             move = move + 1 
     return (np.array(result) , img_list) if animation_axes is not None else np.array(result)
 
-def save_STAC_animation(array:np.ndarray,window:int,output_dir:str) -> None:
+def save_STAC_animation(times:np.ndarray,array:np.ndarray,window:int,output_dir:str) -> None:
     os.makedirs(output_dir,exist_ok=True)
     split_array = array.reshape(-1,window)
     for i,arr in enumerate(split_array):
         fig , axes = plt.subplots(3,1)
         axes[0].set_title(f'Data window{i+1}')
         for j,arr_ in enumerate(split_array):
-            axes[0].plot( [*[np.nan]*j*window] + list(arr_) , 'red' if np.all(arr==arr_) else 'black')
-        amp , ims = convolve(array,arr,axes[1:])
+            axes[0].plot(times[:(j+1)*window],[*[np.nan]*j*window] + list(arr_) , 'red' if np.all(arr==arr_) else 'black')
+        amp , ims = convolve(array,arr,times,'valid',axes[1:])
         axes[0].set_xlim(axes[1].get_xlim())
-        axes[1].set_title('Animation')
+        axes[0].set_xlabel('Time [sec]')
+        axes[1].set_xlabel('Time [sec]')
         axes[2].set_title('Convolution result')
+        axes[2].set_xlabel('Lag [sec]')
         plt.tight_layout()
         anim = ArtistAnimation(fig,ims,interval=10)
-        anim.save(f'window_{i}_AC_result.gif')
+        #break
+        anim.save(os.path.join(output_dir,f'window{i+1}_convolition.gif'))
+        plt.clf()
+    #plt.show()
     
-def STAC(array,window_size,step):
+def STAC(times:np.ndarray,array:np.ndarray,window_size:int,step:int) -> np.ndarray:
     result = []
     step = step
-    fig , axes = plt.subplots(2,1)
     for i in range((len(array) - window_size) // step):
         tmp_array = array[i*step:i*step + window_size]
-        amp , _  = convolve(array,tmp_array,axes)
+        amp  = convolve(array,tmp_array,times,'right')
         result.append(amp)
     return np.array(result)
 
+    
 if __name__ == '__main__':
-    N = 256
-    times = np.linspace(0,10,N)
-    y = np.sin(2*np.pi*times)
-    STAC(y,N//4,N//4)
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 18
+    N = 1024
+    times = np.linspace(0,30,N)
+    y = np.sin(2*np.pi*times*0.5) + np.random.randn(N) + np.random.randn(N)
+    window = 128
+    stac = STAC(times,y,window,1)
+    fig , axes = plt.subplots(2,1)
+    axes[0].plot(times,y)
+    im = axes[1].imshow(stac.T,extent=[0,times[-1],0,times[-2]],origin='lower',cmap='binary')
+    axes[1].set_xlabel('Time [sec]')
+    axes[1].set_ylabel('Lag time [sec]')
+    plt.colorbar(im)
+    plt.show()
+    
+    
 
 
