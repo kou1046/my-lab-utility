@@ -45,7 +45,7 @@ def my_get_peakindex(array,num:int) -> np.ndarray:
         cnt = cnt + 1
     return np.array(result)
 
-def convolve(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',animation_axes=None):
+def cross_correlate(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',animation_axes=None):
     if mode not in ['full','right','valid']:
         raise ValueError('error')
     if animation_axes is not None:
@@ -59,8 +59,6 @@ def convolve(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',animation_ax
     is_move = False
     move = 0 
     for tau in range_:
-        if tau == f_N+g_N - 1:
-            print('')
         if tau < g_N - 1 :
             tmp_f = f[:tau+1]
             tmp_g = g[(g_N-1)-tau:]
@@ -93,7 +91,7 @@ def save_STAC_animation(times:np.ndarray,array:np.ndarray,window:int,output_dir:
         axes[0].set_title(f'Data window{i+1}')
         for j,arr_ in enumerate(split_array):
             axes[0].plot(times[:(j+1)*window],[*[np.nan]*j*window] + list(arr_) , 'red' if np.all(arr==arr_) else 'black')
-        amp , ims = convolve(array,arr,times,'valid',axes[1:])
+        amp , ims = cross_correlate(array,arr,times,'valid',axes[1:])
         axes[0].set_xlim(axes[1].get_xlim())
         axes[0].set_xlabel('Time [sec]')
         axes[1].set_xlabel('Time [sec]')
@@ -111,27 +109,20 @@ def STAC(times:np.ndarray,array:np.ndarray,window_size:int,step:int) -> np.ndarr
     step = step
     for i in range((len(array) - window_size) // step):
         tmp_array = array[i*step:i*step + window_size]
-        amp  = convolve(array,tmp_array,times,'right')
+        amp  = cross_correlate(array,tmp_array,times,'right')
         result.append(amp)
     return np.array(result)
 
-    
 if __name__ == '__main__':
     plt.rcParams['font.family'] = 'Times New Roman'
     plt.rcParams['font.size'] = 18
-    N = 1024
+    N = 512
     times = np.linspace(0,30,N)
-    y = np.sin(2*np.pi*times*0.5) + np.random.randn(N) + np.random.randn(N)
-    window = 128
-    stac = STAC(times,y,window,1)
-    fig , axes = plt.subplots(2,1)
-    axes[0].plot(times,y)
-    im = axes[1].imshow(stac.T,extent=[0,times[-1],0,times[-2]],origin='lower',cmap='binary')
-    axes[1].set_xlabel('Time [sec]')
-    axes[1].set_ylabel('Lag time [sec]')
-    plt.colorbar(im)
+    y = np.sin(2*np.pi*times*0.5) 
+    fig , ax = plt.subplots()
+    ax.plot(np.convolve(y,list(reversed(y)),mode='same'))
     plt.show()
-    
+
     
 
 
