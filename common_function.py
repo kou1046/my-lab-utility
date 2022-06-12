@@ -52,8 +52,8 @@ def cross_correlate(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',anima
     if animation_axes is not None:
         animation_axes[0].plot(times,f,'black')
     if normalize:
-        f_mean = np.mean(f)
-        g_mean = np.mean(g)
+        f_mean = np.mean(f[~np.isnan(f)])
+        g_mean = np.mean(g[~np.isnan(g)])
     f_N = len(f)
     g_N = len(g)
     lag_times = np.array(list(reversed(-1*times[1:g_N])) + list(times)) if mode == 'full' else times
@@ -64,16 +64,24 @@ def cross_correlate(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',anima
     move = 0 
     for tau in range_:
         if tau < g_N - 1 :
-            tmp_f = f[:tau+1]
-            tmp_g = g[(g_N-1)-tau:]
+            tmp_f = f[:tau+1].copy()
+            tmp_g = g[(g_N-1)-tau:].copy()
         elif tau <= f_N - 1 : 
             is_move = True 
-            tmp_f = f[move:tau+1]
-            tmp_g = g
+            tmp_f = f[move:tau+1].copy()
+            tmp_g = g.copy()
         elif tau > f_N - 1:
-            tmp_f = f[move:]
-            tmp_g = g[:len(tmp_f)]
-        result = np.sum(tmp_f * tmp_g) if not normalize else (np.sum((tmp_f-f_mean)*(tmp_g-g_mean))) / (np.linalg.norm(tmp_f-f_mean) * np.linalg.norm(tmp_g-g_mean))
+            tmp_f = f[move:].copy()
+            tmp_g = g[:len(tmp_f)].copy()
+
+        if np.any(np.isnan(tmp_f)) or np.any(np.isnan(tmp_g)):
+            f_nan_idx = np.where(np.isnan(tmp_f))
+            g_nan_idx = np.where(np.isnan(tmp_g))
+            tmp_f[np.hstack((f_nan_idx,g_nan_idx))] = np.nan
+            tmp_g[np.hstack((f_nan_idx,g_nan_idx))] = np.nan
+            result = np.sum(tmp_f[~np.isnan(tmp_f)] * tmp_g[~np.isnan(tmp_g)]) if not normalize else (np.sum((tmp_f[~np.isnan(tmp_f)]-f_mean)*(tmp_g[~np.isnan(tmp_g)]-g_mean))) / (np.linalg.norm(tmp_f[~np.isnan(tmp_f)]-f_mean) * np.linalg.norm(tmp_g[~np.isnan(tmp_g)]-g_mean))
+        else:
+            result = np.sum(tmp_f * tmp_g) if not normalize else (np.sum((tmp_f-f_mean)*(tmp_g-g_mean))) / (np.linalg.norm(tmp_f-f_mean) * np.linalg.norm(tmp_g-g_mean))
         CC.append(result) 
         if animation_axes is not None:
             tmp_t = times[:tau+1]
