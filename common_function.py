@@ -1,9 +1,8 @@
-from cmath import sin
-from matplotlib.colors import LogNorm
 import numpy as np 
 import matplotlib.pyplot as plt
 from matplotlib.animation import ArtistAnimation
 import os 
+from scipy import interpolate
 
 def STFT(array:np.ndarray,window_size:int,step:int,window_func=np.hamming) -> np.ndarray:
     result = []
@@ -127,24 +126,66 @@ def STAC(times:np.ndarray,array:np.ndarray,window_size:int,step:int,normalize=Fa
         result.append(amp)
     return np.array(result)
 
+def my_interpolation(X:np.ndarray,Y:np.ndarray):
+    Y_nan_idxes = np.where(np.isnan(Y))
+    tmp_X = X.copy()
+    tmp_Y = Y.copy()
+    tmp_X = np.delete(tmp_X,Y_nan_idxes)
+    tmp_Y = np.delete(tmp_Y,Y_nan_idxes)
+    return interpolate.interp1d(tmp_X,tmp_Y,kind='cubic')
+
+def moving_correlate(array1:np.ndarray,array2:np.ndarray,times:np.ndarray,window:int,animation_axes:np.ndarray=None,center=False):
+    if len(array1) != len(array2):
+        raise(ValueError)
+    f = array1.copy()
+    g = array2.copy()
+    N = len(f)
+    MC = []
+    ims = []
+    if animation_axes is not None :
+        animation_axes[0].plot(times,array1,'black')
+        animation_axes[0].plot(times,array2,'black')
+    for tau in range(N-1):
+        range_ = slice(tau,tau+window)
+        tmp_f = f[range_]
+        tmp_g = g[range_]
+        if np.any(np.isnan(tmp_f)) or np.any(np.isnan(tmp_g)):
+            f_nan_idx = np.where(np.isnan(tmp_f))
+            g_nan_idx = np.where(np.isnan(tmp_g))
+            tmp_f[np.hstack((f_nan_idx,g_nan_idx))] = np.nan
+            tmp_g[np.hstack((f_nan_idx,g_nan_idx))] = np.nan
+            result = np.corrcoef(tmp_f[~np.isnan(tmp_f)],tmp_g[~np.isnan(tmp_g)])[0][1] if len(times-1) >= tau+window else np.nan
+        else:
+            result = np.corrcoef(tmp_f,tmp_g)[0][1] if len(times-1) >= tau+window else np.nan
+        MC.append(result)
+        if animation_axes is not None:
+            im = animation_axes[0].plot(times[:tau+window],[*[np.nan]*tau]+list(tmp_f),'red')
+            im_2 = animation_axes[0].plot(times[:tau+window],[*[np.nan]*tau]+list(tmp_g),'blue')
+            im_3 = animation_axes[1].plot(times[:tau+1],MC,'k')
+            im_4 = animation_axes[0].axvspan(times[tau],times[tau+window if len(times)-1 >= tau+window else -1],color='lightgray')
+            ims.append(im+im_2+im_3+[im_4])
+    return (MC,ims) if animation_axes is not None else MC
+
 if __name__ == '__main__':
     import pandas as pd
     plt.rcParams['font.family'] = 'Times New Roman'
     plt.rcParams['font.size'] = 15
-    df = pd.read_csv('Acceleration_data.csv')
-    y = np.array(df['z_acc'])
-    times = np.array(df['time'])
-    fig , axes = plt.subplots(2,1)
-    window = 40
-    stac = STFT(y,window,1)
-    axes[0].plot(times,y,'black')
-    axes[0].set_xlabel('Time [Sec]')
-    axes[0].set_xlim([0,times[-1]])
-    im = axes[1].imshow(stac.T,origin='lower',aspect='auto',extent=[0,times[-1],0,(1/(times[1]-times[0]))//2],cmap='binary')
-    axes[1].set_xlabel('Time [Sec]')
-    axes[1].set_ylabel('Lag [Sec]')
-    plt.tight_layout()
+    N = 256
+    times = np.linspace(0,10,N)
+    y = np.sin(2*np.pi*times) + np.sin(2*np.pi*times*3)
+    y_ = y.copy()
+    y_[y_ > 0.5] = np.nan
+    fig , axes = plt.subplots(3,1)
+    y_interpolation = my_interpolation(times,y_,)
+    axes[0].plot(times,y)
+    axes[1].plot(times,y_)
+    axes[1].set_ylim(axes[0].get_ylim())
+    axes[2].plot(times,y_interpolation(times))
+    axes[2].set_ylim(axes[0].get_ylim())
+    
     plt.show()
+        
+    
     
     
 
