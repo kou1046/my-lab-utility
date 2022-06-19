@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import ArtistAnimation
 import os 
 from scipy import interpolate
-from mpl_toolkits.mplot3d.art3d import PolyCollection
+from mpl_toolkits.mplot3d.art3d import PolyCollection , Poly3DCollection
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List
 
@@ -30,16 +30,19 @@ def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:List,edgecolors='k',fill=
     xs = np.linspace(x_min,x_max,x_len)
     ys = np.linspace(y_min,y_max,y_len)
     verts = []
-    for ydir in range(len(dim_2_array)):
+    ims = []
+    for ydir in range(y_len):
         zs = dim_2_array[ydir]
         if fill:
             verts.append(list(zip(np.hstack((xs[0],xs,xs[-1])),np.hstack((zmin,zs,zmin)))))
         else:
-            ax_3d.plot(xs,np.full(xs.shape,ys[ydir]),zs,c=edgecolors if type(edgecolors) is str or edgecolors is None else edgecolors[ydir])
+            im = ax_3d.plot(xs,np.full(xs.shape,ys[ydir]),zs,c=edgecolors if type(edgecolors) is str or edgecolors is None else edgecolors[ydir])
+            ims.append(*im)
     if fill:
         polygon = PolyCollection(verts,edgecolors=edgecolors,facecolors=facecolors,alpha=alpha)
-        ax_3d.add_collection3d(polygon,zs=ys,zdir='y')
-    ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
+        ims = ax_3d.add_collection3d(polygon,zs=ys,zdir='y')
+        ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
+    return ims
 
 def DFT(array):
     N = len(array)
@@ -64,6 +67,17 @@ def my_get_peakindex(array,num:int) -> np.ndarray:
                 break
         cnt = cnt + 1
     return np.array(result)
+
+def get_Rectangular_face(cors:List):
+    cor_1  , cor_2 , cor_3 , cor_4 , cor_5 , cor_6 , cor_7 , cor_8 = cors
+    vert_1 = np.array([cor_1] + [cor_2] + [cor_3] + [cor_4])
+    vert_2 = np.array([cor_5] + [cor_6] + [cor_7] + [cor_8])
+    vert_3 = np.array([cor_1] + [cor_2] + [cor_6] + [cor_5])
+    vert_4 = np.array([cor_3] + [cor_4] + [cor_8] + [cor_7])
+    vert_5 = np.array([cor_1] + [cor_4] + [cor_8] + [cor_5])
+    vert_6 = np.array([cor_2] + [cor_3] + [cor_7] + [cor_6]) 
+    verts = np.vstack(([vert_1],[vert_2],[vert_3],[vert_4],[vert_5],[vert_6]))
+    return verts
 
 def cross_correlate(f:np.ndarray,g:np.ndarray,times:np.ndarray,mode='full',animation_axes=None,normalize=False):
     if mode not in ['full','right','valid']:
@@ -186,25 +200,52 @@ def moving_correlate(array1:np.ndarray,array2:np.ndarray,times:np.ndarray,window
             ims.append(im+im_2+im_3+[im_4])
     return (MC,ims) if animation_axes is not None else MC
 
+def moving_correlate_3d(array_1,array_2,times,window,axes_3d=None):
+    if axes_3d is not None:
+        waterfall_plot(axes_3d[0],array_1,extent=[0,times[-1],0,len(array_1)])
+        waterfall_plot(axes_3d[0],array_2,extent=[0,times[-1],0,len(array_1)])
+        zmin , zmax = axes_3d[0].get_zlim()
+        ymin , ymax = axes_3d[0].get_ylim()
+    dt = times[1] - times[0]
+    D , N = array_1.shape
+    F = array_1.copy()
+    G = array_2.copy()
+    MC_array = []
+    ims = []
+    for tau in range(N-1):
+        tmp_F = F[:,tau:tau+window]
+        tmp_G = G[:,tau:tau+window]
+        tmp_F_mean = tmp_F.mean(axis=1).reshape(-1,1)
+        tmp_G_mean = tmp_G.mean(axis=1).reshape(-1,1)
+        result = np.sum((tmp_F-tmp_F_mean) * (tmp_G-tmp_G_mean),axis=1).reshape(-1,1) / np.sum((np.linalg.norm(tmp_F-tmp_F_mean,axis=1).reshape(-1,1)*np.linalg.norm(tmp_G-tmp_G_mean,axis=1).reshape(-1,1)),axis=1).reshape(-1,1)
+        if tau == 0 :
+            MC_array = result.copy()
+        else:
+            MC_array = np.hstack((MC_array,result))
+        if axes_3d is not None:
+            cor_1 = [(dt*tau,ymin,zmin),(dt*(tau+window),ymin,zmin),(dt*(tau+window),ymax,zmin),(dt*tau,ymax,zmin)]
+            cor_2 = [(cor[0],cor[1],zmax) for cor in cor_1]
+            window_box = Poly3DCollection(get_Rectangular_face(cor_1+cor_2),color='gray',alpha=0.4)
+            im = axes[0].add_collection3d(window_box)
+            im_2 = waterfall_plot(axes[0],tmp_F,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='r')
+            im_3 = waterfall_plot(axes[0],tmp_G,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='b')
+            im_4 = waterfall_plot(axes[1],MC_array,extent=[0,times[tau],0,D])
+            ims.append([im] + im_2 + im_3 + im_4)
+    return (MC_array , ims) if axes_3d is not None else MC_array
+
 if __name__ == '__main__':
-    for option,value in zip(['font.size','font.family','axes.labelpad'],[24,'Times New Roman',40]):
-        plt.rcParams[option] = value
-    N = 6
-    times = np.linspace(0,10,256)
-    freq = np.linspace(0,1,N).reshape(-1,1)
-    y_list = np.sin(2*np.pi*times*freq)
-    window = 128
-    step = 1
-    dt = times[1]-times[0]
-    fig = plt.figure()
-    ax = fig.add_subplot(111,projection='3d')
-    ax.set(xlabel='t [sec]',ylabel='ω [Hz]',zlabel='f',box_aspect=(1,2,1),title='f(ω,t) = sin(2πωt)')
-    ax.tick_params(axis='z',pad=20)
-    facecolors = plt.get_cmap('summer').reversed()(np.linspace(0,1,len(freq)))
-    waterfall_plot(ax,y_list,[0,times[-1],0,freq[-1][0]],fill=True,facecolors=facecolors)
+    N = 256
+    window = 64
+    times = np.linspace(0,10,N)
+    dt = times[1] - times[0]
+    freq = np.linspace(1,2,3).reshape(-1,1)
+    y_1_list = np.sin(2*np.pi*times*freq)
+    y_2_list = 0.5*np.cos(2*np.pi*times*freq)
+    fig , axes = plt.subplots(2,1,subplot_kw={'projection':'3d'})
+    axes[0].set_box_aspect((3,2,1))
+    mo , ims = moving_correlate_3d(y_1_list,y_2_list,times,window,axes)
+    anim = ArtistAnimation(fig,ims)
     plt.show()
-        
-    
     
     
 
