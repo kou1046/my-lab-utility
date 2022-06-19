@@ -24,18 +24,21 @@ def plot_3d_spectrogram(ax_3d,array,N,fs,window_size,step) -> None:
     Z = array.T
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
 
-def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:List,edgecolors='k',facecolors='w',alpha=1):
-    verts = []
+def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:List,edgecolors='k',fill=False,facecolors='w',alpha=1,zmin=0):
     y_len , x_len ,  = dim_2_array.shape
     x_min , x_max , y_min , y_max = extent
     xs = np.linspace(x_min,x_max,x_len)
     ys = np.linspace(y_min,y_max,y_len)
+    verts = []
     for ydir in range(len(dim_2_array)):
         zs = dim_2_array[ydir]
-        #ax_3d.plot(xs,np.full(xs.shape,ys[ydir]),zs)
-        verts.append(list(zip(np.hstack((xs[0],xs,xs[-1])),np.hstack((0,zs,0)))))
-    polygon = PolyCollection(verts,edgecolors=edgecolors,facecolors=facecolors,alpha=alpha)
-    ax_3d.add_collection3d(polygon,zs=ys,zdir='y')
+        if fill:
+            verts.append(list(zip(np.hstack((xs[0],xs,xs[-1])),np.hstack((zmin,zs,zmin)))))
+        else:
+            ax_3d.plot(xs,np.full(xs.shape,ys[ydir]),zs,c=edgecolors if type(edgecolors) is str or edgecolors is None else edgecolors[ydir])
+    if fill:
+        polygon = PolyCollection(verts,edgecolors=edgecolors,facecolors=facecolors,alpha=alpha)
+        ax_3d.add_collection3d(polygon,zs=ys,zdir='y')
     ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
 
 def DFT(array):
@@ -184,19 +187,21 @@ def moving_correlate(array1:np.ndarray,array2:np.ndarray,times:np.ndarray,window
     return (MC,ims) if animation_axes is not None else MC
 
 if __name__ == '__main__':
-    N = 512
-    times = np.linspace(0,10,N)
-    y = np.sin(2*np.pi*times*times)
-    window = 32
+    for option,value in zip(['font.size','font.family','axes.labelpad'],[24,'Times New Roman',40]):
+        plt.rcParams[option] = value
+    N = 6
+    times = np.linspace(0,10,256)
+    freq = np.linspace(0,1,N).reshape(-1,1)
+    y_list = np.sin(2*np.pi*times*freq)
+    window = 128
     step = 1
     dt = times[1]-times[0]
-    stft = STFT(y,window,step)
     fig = plt.figure()
-    axes = [fig.add_subplot(211),fig.add_subplot(212,projection='3d')]
-    axes[0].plot(times,y)
-    axes[1].set(xlabel='Times [sec]',ylabel='Frequecy [Hz]',zlabel='Powerspectol')
-    facecolors = plt.get_cmap('binary')(np.linspace(0,1,len(stft.T)))
-    waterfall_plot(axes[1],stft.T,[0,times[-1],0,(1/dt)/2],alpha=0.9,facecolors=facecolors)
+    ax = fig.add_subplot(111,projection='3d')
+    ax.set(xlabel='t [sec]',ylabel='ω [Hz]',zlabel='f',box_aspect=(1,2,1),title='f(ω,t) = sin(2πωt)')
+    ax.tick_params(axis='z',pad=20)
+    facecolors = plt.get_cmap('summer').reversed()(np.linspace(0,1,len(freq)))
+    waterfall_plot(ax,y_list,[0,times[-1],0,freq[-1][0]],fill=True,facecolors=facecolors)
     plt.show()
         
     
