@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import ArtistAnimation
 import os 
 from scipy import interpolate
+from mpl_toolkits.mplot3d.art3d import PolyCollection
+from mpl_toolkits.mplot3d import Axes3D
+from typing import List
 
 def STFT(array:np.ndarray,window_size:int,step:int,window_func=np.hamming) -> np.ndarray:
     result = []
@@ -20,6 +23,20 @@ def plot_3d_spectrogram(ax_3d,array,N,fs,window_size,step) -> None:
     X , Y = np.meshgrid(time_mesh,freq_mesh)
     Z = array.T
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
+
+def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:List,edgecolors='k',facecolors='w',alpha=1):
+    verts = []
+    y_len , x_len ,  = dim_2_array.shape
+    x_min , x_max , y_min , y_max = extent
+    xs = np.linspace(x_min,x_max,x_len)
+    ys = np.linspace(y_min,y_max,y_len)
+    for ydir in range(len(dim_2_array)):
+        zs = dim_2_array[ydir]
+        #ax_3d.plot(xs,np.full(xs.shape,ys[ydir]),zs)
+        verts.append(list(zip(np.hstack((xs[0],xs,xs[-1])),np.hstack((0,zs,0)))))
+    polygon = PolyCollection(verts,edgecolors=edgecolors,facecolors=facecolors,alpha=alpha)
+    ax_3d.add_collection3d(polygon,zs=ys,zdir='y')
+    ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
 
 def DFT(array):
     N = len(array)
@@ -167,22 +184,19 @@ def moving_correlate(array1:np.ndarray,array2:np.ndarray,times:np.ndarray,window
     return (MC,ims) if animation_axes is not None else MC
 
 if __name__ == '__main__':
-    import pandas as pd
-    plt.rcParams['font.family'] = 'Times New Roman'
-    plt.rcParams['font.size'] = 15
-    N = 256
+    N = 512
     times = np.linspace(0,10,N)
-    y = np.sin(2*np.pi*times) + np.sin(2*np.pi*times*3)
-    y_ = y.copy()
-    y_[y_ > 0.5] = np.nan
-    fig , axes = plt.subplots(3,1)
-    y_interpolation = my_interpolation(times,y_,)
+    y = np.sin(2*np.pi*times*times)
+    window = 32
+    step = 1
+    dt = times[1]-times[0]
+    stft = STFT(y,window,step)
+    fig = plt.figure()
+    axes = [fig.add_subplot(211),fig.add_subplot(212,projection='3d')]
     axes[0].plot(times,y)
-    axes[1].plot(times,y_)
-    axes[1].set_ylim(axes[0].get_ylim())
-    axes[2].plot(times,y_interpolation(times))
-    axes[2].set_ylim(axes[0].get_ylim())
-    
+    axes[1].set(xlabel='Times [sec]',ylabel='Frequecy [Hz]',zlabel='Powerspectol')
+    facecolors = plt.get_cmap('binary')(np.linspace(0,1,len(stft.T)))
+    waterfall_plot(axes[1],stft.T,[0,times[-1],0,(1/dt)/2],alpha=0.9,facecolors=facecolors)
     plt.show()
         
     
