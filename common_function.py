@@ -200,12 +200,15 @@ def moving_correlate(array1:np.ndarray,array2:np.ndarray,times:np.ndarray,window
             ims.append(im+im_2+im_3+[im_4])
     return (MC,ims) if animation_axes is not None else MC
 
-def moving_correlate_3d(array_1,array_2,times,window,axes_3d=None):
+def moving_correlate_3d(array_1,array_2,times,window, axes=None, axes_3d=None, colors=None):
     if axes_3d is not None:
         waterfall_plot(axes_3d[0],array_1,extent=[0,times[-1],0,len(array_1)])
         waterfall_plot(axes_3d[0],array_2,extent=[0,times[-1],0,len(array_1)])
         zmin , zmax = axes_3d[0].get_zlim()
         ymin , ymax = axes_3d[0].get_ylim()
+    if axes is not None:
+        axes[0].stackplot(times,*array_1, colors=colors)
+        axes[1].stackplot(times,*array_2, colors=colors)
     dt = times[1] - times[0]
     D , N = array_1.shape
     F = array_1.copy()
@@ -226,12 +229,17 @@ def moving_correlate_3d(array_1,array_2,times,window,axes_3d=None):
             cor_1 = [(dt*tau,ymin,zmin),(dt*(tau+window),ymin,zmin),(dt*(tau+window),ymax,zmin),(dt*tau,ymax,zmin)]
             cor_2 = [(cor[0],cor[1],zmax) for cor in cor_1]
             window_box = Poly3DCollection(get_Rectangular_face(cor_1+cor_2),color='gray',alpha=0.4)
-            im = axes[0].add_collection3d(window_box)
-            im_2 = waterfall_plot(axes[0],tmp_F,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='r')
-            im_3 = waterfall_plot(axes[0],tmp_G,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='b')
-            im_4 = waterfall_plot(axes[1],MC_array,extent=[0,times[tau],0,D])
+            im = axes_3d[0].add_collection3d(window_box)
+            im_2 = waterfall_plot(axes_3d[0],tmp_F,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='r')
+            im_3 = waterfall_plot(axes_3d[0],tmp_G,extent=[times[tau],times[tau+window if len(times)-1 >= tau+window else -1],0,D],edgecolors='b')
+            im_4 = waterfall_plot(axes_3d[1],MC_array,extent=[0,times[tau],0,D])
             ims.append([im] + im_2 + im_3 + im_4)
-    return (MC_array , ims) if axes_3d is not None else MC_array
+        if axes is not None:
+            im = axes[0].axvspan(times[tau],times[tau+window if len(times)-1 >= tau+window else -1],color='lightgray')
+            im_2 = axes[1].axvspan(times[tau],times[tau+window if len(times)-1 >= tau+window else -1],color='lightgray')
+            ax_3_im_list = [axes[2].plot(times[:tau+1],MC,color)[0] for MC,color in zip(MC_array,colors)]
+            ims.append([im]+[im_2]+ax_3_im_list)
+    return (MC_array , ims) if axes_3d is not None or axes is not None else MC_array 
 
 if __name__ == '__main__':
     N = 256
