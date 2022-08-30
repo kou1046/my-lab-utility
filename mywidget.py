@@ -27,7 +27,7 @@ class ScrollImageViewer(tk.Canvas):
         if img_path_sequence is not None:
             self.photos = [ImageTk.PhotoImage(image=Image.open(i)) for i in img_path_sequence]
         if img_sequence is not None:
-            self.photos = [ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(i,cv2.COLOR_BGR2RGB))) for i in img_path_sequence]
+            self.photos = [ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(i,cv2.COLOR_BGR2RGB))) for i in img_sequence]
         if self.photos:
             self._draw_canvas()
     def _draw_canvas(self):
@@ -41,6 +41,9 @@ class ScrollImageViewer(tk.Canvas):
     def append_img(self,img:np.ndarray):
         self.photos.append(ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))))
         self.index = len(self.photos) - 1
+    def del_img(self, index:int):
+        del self.photos[index]
+        self.index = (index - 1) if index > 0 else index + 1
     @property
     def index(self):
         return self._index
