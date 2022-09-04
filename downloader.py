@@ -11,7 +11,10 @@ from PIL import Image
 from io import BytesIO
 import cv2 
 from selenium import webdriver
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from typing import Optional
+import time
 
 @dataclass
 class NamedImage:
@@ -32,11 +35,13 @@ class NamedImageFolder:
             old_name, ext = os.path.splitext(img.name)
             new_name = str(int(old_name) - 1) + ext
             img.name = new_name
-
+            
+TIMEOUT_TIME = 10
 class ImageDownloader:
     def __init__(self, webdriver_path:str):
         self.folders:list[NamedImageFolder] = []
         self.driver = webdriver.Chrome(webdriver_path)
+        self.driver.implicitly_wait(TIMEOUT_TIME)
     def set_imgs_with_request(self, url:str, imgs_name:str, inner:bool=False) -> None: #inner=True → サムネイルクリック先の画像urlを取り出す
         res = requests.get(url)
         bs = BeautifulSoup(res.text, 'html.parser')
@@ -48,9 +53,10 @@ class ImageDownloader:
         img_urls = self._filter_imgs(img_urls)
         self._set_imgs(img_urls, imgs_name)
     def set_imgs_with_selenium(self, url:str, imgs_name:str, inner:bool=False, #loading_css_selectorを設定すると指定したセレクタのdomがなくなるまで待機する（読み込み対策）
-                                loading_css_selector:Optional[str]=None): 
+                                loading_css_selector:Optional[str]=None,): 
 
         self.driver.get(url)
+        
         if loading_css_selector:
             while True:
                 loading_contents = self.driver.find_elements_by_css_selector(loading_css_selector)
@@ -99,7 +105,7 @@ class ImageDownloader:
     def _filter_imgs(self, img_urls:Sequence[str]) -> list[str]: #指定した拡張子以外は除外
         filter_exts = {'png', 'jpg'}
         return [url for url in img_urls if url[-3:] in filter_exts]
-
+    
 def imwrite(filename, img, params=None): #cv2.imwriteが日本語に対応してないので代わり
     try:
         ext = os.path.splitext(filename)[1]
