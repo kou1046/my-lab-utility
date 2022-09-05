@@ -1,7 +1,7 @@
 from __future__ import annotations
 from msilib import sequence
 import matplotlib.pyplot as plt 
-from typing import Any, Literal, Optional, Sequence, Type, Union
+from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
 
@@ -27,7 +27,8 @@ plt_params = {
         
 }
 
-def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:Sequence[float|int],
+T = TypeVar('T', int, float)
+def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
                    edgecolors:str|Sequence[str]='k', fill:Optional[bool]=False,
                    facecolors:str|Sequence[str]='w', alpha:float|int=1, zmin:float|int=0):
     y_len , x_len ,  = dim_2_array.shape
@@ -51,7 +52,7 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:Sequence[float|int],
 
 
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, str]]
-def my_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k',
+def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k',
             kws:Optional[KwsType]=None) -> None:
     if kws is not None:
         bar_kw = kws['bar_kw'] if 'bar_kw' in kws else {}
@@ -82,6 +83,6 @@ if __name__ == '__main__':
     for group, values in plt_params.items(): plt.rc(group, **values)
     sample_dataset = np.random.rand(3, 12)
     fig, ax = plt.subplots()
-    my_plot(sample_dataset, ax, colors=['b', 'g', 'purple'])
+    error_plot(sample_dataset, ax, colors=['b', 'g', 'purple'])
     plt.show()
     

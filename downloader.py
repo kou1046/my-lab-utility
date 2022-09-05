@@ -11,10 +11,8 @@ from PIL import Image
 from io import BytesIO
 import cv2 
 from selenium import webdriver
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.remote.webelement import WebElement
 from typing import Optional
-import time
 
 @dataclass
 class NamedImage:
@@ -46,26 +44,30 @@ class ImageDownloader:
         res = requests.get(url)
         bs = BeautifulSoup(res.text, 'html.parser')
         if inner:
-            hrefs = [img_tag.parent['href'] for img_tag in bs.select('img')] 
-            img_urls = [url for url in hrefs if url[-3:] == 'png' or url[-3:] == 'jpg'] 
+            img_urls = [img_tag.parent['href'] for img_tag in bs.select('img') if img_tag.parent.name == 'a'] 
         else:
             img_urls = [img_tag['src'] for img_tag in bs.select('img')]
+            
         img_urls = self._filter_imgs(img_urls)
         self._set_imgs(img_urls, imgs_name)
     def set_imgs_with_selenium(self, url:str, imgs_name:str, inner:bool=False, #loading_css_selectorを設定すると指定したセレクタのdomがなくなるまで待機する（読み込み対策）
                                 loading_css_selector:Optional[str]=None,): 
 
         self.driver.get(url)
-        
+        select = self.driver.find_elements_by_css_selector
+
         if loading_css_selector:
             while True:
-                loading_contents = self.driver.find_elements_by_css_selector(loading_css_selector)
+                loading_contents = select(loading_css_selector)
                 if not loading_contents:
                     break
                 cor = loading_contents[0].location
                 self.driver.execute_script(f"window.scrollTo(0,{cor['y']});")
-
-        img_urls = [img_tag.get_attribute('src') for img_tag in self.driver.find_elements_by_css_selector('img')]
+        if inner:
+            img_urls = [attr(get_parent(img_tag), 'href') for img_tag in select('img') if get_parent(img_tag).tag_name == 'a']
+        else:   
+            img_urls = [attr(img_tag, 'src') for img_tag in select('img')]
+        
         img_urls = self._filter_imgs(img_urls)
         self._set_imgs(img_urls, imgs_name)
     def view(self) -> None:
@@ -102,9 +104,12 @@ class ImageDownloader:
                 continue
             imgs.append(NamedImage(str(i-none_num).zfill(5)+ext, img))
         self.folders.append(NamedImageFolder(imgs_name, imgs))
-    def _filter_imgs(self, img_urls:Sequence[str]) -> list[str]: #指定した拡張子以外は除外
+    def _filter_imgs(self, img_urls:Sequence[str]) -> list[str]: 
+        """
+        最後3文字が指定した文字列以外は除外する．(ここで，目的のurlが画像の参照ではなく，他のwebページだったり，.pngXXXXXのような文字列を排除するのが目的)
+        """
         filter_exts = {'png', 'jpg'}
-        return [url for url in img_urls if url[-3:] in filter_exts]
+        return [url for url in img_urls if (url is not None) and (url[-3:] in filter_exts)]
     
 def imwrite(filename, img, params=None): #cv2.imwriteが日本語に対応してないので代わり
     try:
@@ -126,13 +131,20 @@ def url_to_image(url:str) -> np.ndarray:
     if response.status_code == 200:
         try:
             img = np.array(Image.open(BytesIO(response.content)).convert('RGB'))
+            img[:, :, 0], img[:, :, 2] = img[:, :, 2], img[:, :, 0]
         except:
             return
         return img
 
+def get_parent(el:WebElement) -> WebElement:
+    return el.find_element_by_xpath('..')
+
+def attr(el:WebElement, attr_name:str) -> str:
+    return el.get_attribute(attr_name)
+
 if __name__ == '__main__':
     loader = ImageDownloader('C:/chromedriver_win32/chromedriver.exe')
-    loader.set_imgs_with_selenium('https://www.yahoo.co.jp/', 'Yahoo_top_page_images')
+    loader.set_imgs_with_request('https://www.yahoo.co.jp/', 'Yahoo_images')
     loader.view()
     loader.save(os.path.join(__file__, '..'))
 
