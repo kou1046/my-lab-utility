@@ -1,6 +1,7 @@
 from __future__ import annotations
+from msilib import sequence
 import matplotlib.pyplot as plt 
-from typing import Literal, Optional, Sequence
+from typing import Any, Literal, Optional, Sequence, Type, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
 
@@ -26,13 +27,15 @@ plt_params = {
         
 }
 
-def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:list,edgecolors='k',fill=False,facecolors='w',alpha=1,zmin=0):
+def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:Sequence[float|int],
+                   edgecolors:str|Sequence[str]='k', fill:Optional[bool]=False,
+                   facecolors:str|Sequence[str]='w', alpha:float|int=1, zmin:float|int=0):
     y_len , x_len ,  = dim_2_array.shape
     x_min , x_max , y_min , y_max = extent
     xs = np.linspace(x_min,x_max,x_len)
     ys = np.linspace(y_min,y_max,y_len)
-    verts = []
-    ims = []
+    verts:list[Any] = []
+    ims:list[Any] = []
     for ydir in range(y_len):
         zs = dim_2_array[ydir]
         if fill:
@@ -47,9 +50,9 @@ def waterfall_plot(ax_3d,dim_2_array:np.ndarray,extent:list,edgecolors='k',fill=
     return ims
 
 
-Kws_type = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, str]]
-def my_plot(dataset:Sequence[int|float], ax, colors:str|Sequence[str]='k',
-            kws:Optional[Kws_type]=None) -> None:
+KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, str]]
+def my_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k',
+            kws:Optional[KwsType]=None) -> None:
     if kws is not None:
         bar_kw = kws['bar_kw'] if 'bar_kw' in kws else {}
         err_kw = kws['err_kw'] if 'err_kw' in kws else {}
@@ -68,7 +71,7 @@ def my_plot(dataset:Sequence[int|float], ax, colors:str|Sequence[str]='k',
     ax.scatter(scatter_xs, dataset, color=scatter_colors, **scatter_kw)
     ax.set(xticks=bar_xs)
 
-def plot_3d_spectrogram(ax_3d,array,N,fs,window_size,step) -> None:
+def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:int, step:int) -> None:
     freq_mesh = [fs*k / window_size for k in range(window_size//2 + 1)]
     time_mesh = np.linspace(0,N*(1/fs),(N-window_size)//step)
     X , Y = np.meshgrid(time_mesh,freq_mesh)
