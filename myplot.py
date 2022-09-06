@@ -5,26 +5,27 @@ from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
 
+
+LINE_WIDTH = 5
 plt_params = {
     'font':{
             'family':'Arial',
-            'size':24,
+            'size':28,
             'weight':'bold',
         },
     'axes':{
             'spines.right':False,
             'spines.top':False,
-            'linewidth':2
+            'linewidth':LINE_WIDTH
         },
     'xtick':{
-        'major.width':3,
-        'major.size':5
+        'major.width':LINE_WIDTH,
+        'major.size':10
     },
     'ytick':{
-        'major.width':3,
-        'major.size':5
+        'major.width':LINE_WIDTH,
+        'major.size':10
     }
-        
 }
 
 T = TypeVar('T', int, float)
@@ -50,10 +51,10 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
         ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
     return ims
 
-
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, str]]
 def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k',
-            kws:Optional[KwsType]=None) -> None:
+                error_type:Literal['SD', 'SE']='SD', kws:Optional[KwsType]=None) -> None:
+    
     if kws is not None:
         bar_kw = kws['bar_kw'] if 'bar_kw' in kws else {}
         err_kw = kws['err_kw'] if 'err_kw' in kws else {}
@@ -63,12 +64,14 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
         
     row_num = len(dataset); col_num = len(dataset[0])
     bar_xs = range(row_num)
-    scatter_xs =  np.array([[x]*col_num for x in bar_xs]).ravel()
+    scatter_xs =  np.array([[x+0.2]*col_num for x in bar_xs]).ravel() #散布図は右に少しずらすため, +0.2
     scatter_colors = np.array([[color]*col_num for color in colors]).ravel() if len(colors) > 1 else colors
     aves = np.mean(dataset, axis=1)
     errors = np.std(dataset, axis=1)
-    ax.bar(bar_xs, aves, edgecolor=colors, fill=False, **bar_kw)
-    ax.errorbar(bar_xs, aves, yerr=errors, capsize=5, fmt='none', ecolor='k', **err_kw)
+    if error_type == 'SE':
+        errors = errors / np.sqrt(row_num)
+    ax.bar(bar_xs, aves, edgecolor=colors, fill=False, linewidth=LINE_WIDTH, **bar_kw)
+    ax.errorbar(bar_xs, aves, yerr=errors, capsize=10, fmt='none', ecolor='k', **err_kw)
     ax.scatter(scatter_xs, dataset, color=scatter_colors, **scatter_kw)
     ax.set(xticks=bar_xs)
 
@@ -81,8 +84,8 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     
 if __name__ == '__main__':
     for group, values in plt_params.items(): plt.rc(group, **values)
-    sample_dataset = np.random.rand(3, 12)
+    sample_dataset = np.random.rand(10, 100)
     fig, ax = plt.subplots()
-    error_plot(sample_dataset, ax, colors=['b', 'g', 'purple'])
+    error_plot(sample_dataset, ax, colors='k', error_type='SE')
     plt.show()
     
