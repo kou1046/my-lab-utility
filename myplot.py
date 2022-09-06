@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
+import itertools
 
 LINE_WIDTH = 5
 rc_params = {
@@ -54,16 +55,19 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
     return ims
 
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, Any]]
-def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_num:float=0.1, #datasetの次元に注意．行の数だけ棒グラフが描画
+def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_nums:float|Sequence[float]=0.1, #datasetの次元に注意．行の数だけ棒グラフが描画
                 error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None:
-    row_num = len(dataset); col_num = len(dataset[0])
+    flat = itertools.chain.from_iterable
+    row_num = len(dataset); col_nums = [len(arr) for arr in dataset]
+    if isinstance(scatter_shift_nums, float):
+        scatter_shift_nums = [scatter_shift_nums]*row_num
     bar_xs = range(row_num)
-    scatter_xs =  np.array([[x]*col_num for x in bar_xs]).ravel() + scatter_shift_num #散布図はscatter_shift_numだけずらすとエラーバーが見やすい
-    scatter_colors = np.array([[color]*col_num for color in colors]).ravel() if not isinstance(colors, str)  else colors
-    aves = np.mean(dataset, axis=1)
-    errors = np.std(dataset, axis=1)
+    scatter_xs =  tuple(flat([[x+shift_num]*x_len for x, x_len, shift_num in zip(bar_xs, col_nums, scatter_shift_nums)])) #散布図はscatter_shift_numだけずらすとエラーバーが見やすい
+    scatter_colors = tuple(flat([[color]*x_len for color, x_len in zip(colors, col_nums)])) if not isinstance(colors, str)  else colors
+    aves = [sum(arr)/len(arr) for arr in dataset]
+    errors = [np.std(arr) for arr in dataset]
     if error_type == 'SE':
-        errors = errors / np.sqrt(col_num)
+        errors = [err / np.sqrt(x_len) for err, x_len in zip(errors, col_nums)]
     
     #デフォルトの各プロットオプション
     bar_kw = {
@@ -75,7 +79,7 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
     err_kw = {
             'yerr':errors,
             'capsize':10,
-            'capthick':LINE_WIDTH,
+            'capthick':5,
             'elinewidth':LINE_WIDTH,
             'fmt':'none',
             'ecolor':'k',
@@ -92,7 +96,7 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
     
     ax.bar(bar_xs, aves, **bar_kw)
     ax.errorbar(bar_xs, aves, **err_kw)
-    ax.scatter(scatter_xs, dataset, **scatter_kw)
+    ax.scatter(scatter_xs, tuple(flat(dataset)), **scatter_kw)
     ax.set(xticks=bar_xs)
 
 def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:int, step:int) -> None:
