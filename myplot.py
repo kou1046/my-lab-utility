@@ -55,16 +55,16 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
     return ims
 
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, Any]]
-def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_nums:float|Sequence[float]=0.1, #datasetの次元に注意．行の数だけ棒グラフが描画
-                error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None:
+def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_nums:float|Sequence[float]=0.1, 
+                error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None: #datasetの次元に注意．行の数だけ棒グラフが描画される．
     flat = itertools.chain.from_iterable
-    row_num = len(dataset); col_nums = [len(arr) for arr in dataset]
-    if isinstance(scatter_shift_nums, float):
-        scatter_shift_nums = [scatter_shift_nums]*row_num
+    row_num = len(dataset); col_nums = [len(arr) for arr in dataset] #行ごとの列の数
+    if isinstance(scatter_shift_nums, float): 
+        scatter_shift_nums = [scatter_shift_nums]*row_num #キャスト
     bar_xs = range(row_num)
     scatter_xs =  tuple(flat([[x+shift_num]*x_len for x, x_len, shift_num in zip(bar_xs, col_nums, scatter_shift_nums)])) #散布図はscatter_shift_numだけずらすとエラーバーが見やすい
     scatter_colors = tuple(flat([[color]*x_len for color, x_len in zip(colors, col_nums)])) if not isinstance(colors, str)  else colors
-    aves = [sum(arr)/len(arr) for arr in dataset]
+    aves = [np.mean(arr) for arr in dataset] #行ごとにの列の数が異なる可能性があるため，それぞれの行に分解してmean, stdを使う必要がある．np.mean(dataset, axis=1)だとエラー
     errors = [np.std(arr) for arr in dataset]
     if error_type == 'SE':
         errors = [err / np.sqrt(x_len) for err, x_len in zip(errors, col_nums)]
@@ -89,6 +89,7 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
         's':150
         }
     
+    #custom_kwsが設定されたときはキーワードの追加または上書き
     if custom_kws is not None:
        bar_kw = {**bar_kw, **custom_kws['bar_kw']} if 'bar_kw' in custom_kws else bar_kw
        err_kw = {**err_kw, **custom_kws['err_kw']} if 'err_kw' in custom_kws else err_kw
@@ -110,12 +111,12 @@ if __name__ == '__main__':
     for group, values in rc_params.items(): plt.rc(group, **values)
     sample_dataset = np.random.rand(2, 15)
     fig, axes = plt.subplots(1, 2)
-    error_plot(sample_dataset, axes[0], colors='k', error_type='SE', scatter_shift_num=0.5, custom_kws={
+    error_plot(sample_dataset, axes[0], colors='k', error_type='SE', scatter_shift_nums=0.5, custom_kws={
         'bar_kw':{
             'hatch':['//', '**']
         },
         'scatter_kw':{
-            'edgecolor':'k',\
+            'edgecolor':'k',
             'linewidth':2
         },
         'err_kw':{
