@@ -54,12 +54,12 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
     return ims
 
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, Any]]
-def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_num:float=0.1,
+def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_num:float=0.1, #datasetの次元に注意．行の数だけ棒グラフが描画
                 error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None:
     row_num = len(dataset); col_num = len(dataset[0])
     bar_xs = range(row_num)
     scatter_xs =  np.array([[x]*col_num for x in bar_xs]).ravel() + scatter_shift_num #散布図はscatter_shift_numだけずらすとエラーバーが見やすい
-    scatter_colors = np.array([[color]*col_num for color in colors]).ravel() if len(colors) > 1 else colors
+    scatter_colors = np.array([[color]*col_num for color in colors]).ravel() if not isinstance(colors, str)  else colors
     aves = np.mean(dataset, axis=1)
     errors = np.std(dataset, axis=1)
     if error_type == 'SE':
@@ -75,6 +75,8 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
     err_kw = {
             'yerr':errors,
             'capsize':10,
+            'capthick':LINE_WIDTH,
+            'elinewidth':LINE_WIDTH,
             'fmt':'none',
             'ecolor':'k',
         }
@@ -102,25 +104,22 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     
 if __name__ == '__main__':
     for group, values in rc_params.items(): plt.rc(group, **values)
-    sample_dataset = np.random.rand(2, 5)
-    names = ('data1', 'data2')
+    sample_dataset = np.random.rand(2, 15)
     fig, axes = plt.subplots(1, 2)
-    error_plot(sample_dataset, axes[0], colors=['#ff7f00', 'b'], error_type='SE', scatter_shift_num=0.5, custom_kws={
-        'err_kw':{
-            'elinewidth':5,
-            'capthick':5
-        },
+    error_plot(sample_dataset, axes[0], colors='k', error_type='SE', scatter_shift_num=0.5, custom_kws={
         'bar_kw':{
-            'fill':True,
-            'width':1.
+            'hatch':['//', '**']
         },
         'scatter_kw':{
             'edgecolor':'k',\
             'linewidth':2
+        },
+        'err_kw':{
+            'capsize':50
         }
     })
-    error_plot(sample_dataset, axes[1], colors=['#ff7f00', 'b'], error_type='SE')
-    for ax, title in zip(axes, ('custom', 'default')): ax.set(xticklabels=names, title=title)
+    error_plot(sample_dataset, axes[1], error_type='SE')
+    for ax, title in zip(axes, ('custom', 'default')): ax.set(title=title, xlabel='data±SE', xticklabels=('data1', 'data2'))
     fig.tight_layout()
     plt.show()
     
