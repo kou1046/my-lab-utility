@@ -69,7 +69,7 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
     aves = np.mean(dataset, axis=1)
     errors = np.std(dataset, axis=1)
     if error_type == 'SE':
-        errors = errors / np.sqrt(row_num)
+        errors = errors / np.sqrt(col_num)
     ax.bar(bar_xs, aves, edgecolor=colors, fill=False, linewidth=LINE_WIDTH, **bar_kw)
     ax.errorbar(bar_xs, aves, yerr=errors, capsize=10, fmt='none', ecolor='k', **err_kw)
     ax.scatter(scatter_xs, dataset, color=scatter_colors, **scatter_kw)
