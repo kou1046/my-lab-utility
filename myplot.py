@@ -5,12 +5,14 @@ from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
 
-
 LINE_WIDTH = 5
-plt_params = {
+rc_params = {
+    'figure':{
+        'figsize':(19.20,10.80)
+    },
     'font':{
             'family':'Arial',
-            'size':28,
+            'size':45,
             'weight':'bold',
         },
     'axes':{
@@ -20,11 +22,11 @@ plt_params = {
         },
     'xtick':{
         'major.width':LINE_WIDTH,
-        'major.size':10
+        'major.size':15
     },
     'ytick':{
         'major.width':LINE_WIDTH,
-        'major.size':10
+        'major.size':15
     }
 }
 
@@ -51,28 +53,44 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
         ax_3d.set(xlim=[x_min,x_max],ylim=[y_min,y_max],zlim=[dim_2_array.min(),dim_2_array.max()])
     return ims
 
-KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, str]]
-def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k',
-                error_type:Literal['SD', 'SE']='SD', kws:Optional[KwsType]=None) -> None:
-    
-    if kws is not None:
-        bar_kw = kws['bar_kw'] if 'bar_kw' in kws else {}
-        err_kw = kws['err_kw'] if 'err_kw' in kws else {}
-        scatter_kw = kws['scatter_kw'] if 'scatter_kw' in kws else {}
-    else:
-        bar_kw = {}; err_kw = {}; scatter_kw = {}
-        
+KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, Any]]
+def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_num:float=0.1,
+                error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None:
     row_num = len(dataset); col_num = len(dataset[0])
     bar_xs = range(row_num)
-    scatter_xs =  np.array([[x+0.2]*col_num for x in bar_xs]).ravel() #散布図は右に少しずらすため, +0.2
+    scatter_xs =  np.array([[x]*col_num for x in bar_xs]).ravel() + scatter_shift_num #散布図はscatter_shift_numだけずらすとエラーバーが見やすい
     scatter_colors = np.array([[color]*col_num for color in colors]).ravel() if len(colors) > 1 else colors
     aves = np.mean(dataset, axis=1)
     errors = np.std(dataset, axis=1)
     if error_type == 'SE':
         errors = errors / np.sqrt(col_num)
-    ax.bar(bar_xs, aves, edgecolor=colors, fill=False, linewidth=LINE_WIDTH, **bar_kw)
-    ax.errorbar(bar_xs, aves, yerr=errors, capsize=10, fmt='none', ecolor='k', **err_kw)
-    ax.scatter(scatter_xs, dataset, color=scatter_colors, **scatter_kw)
+    
+    #デフォルトの各プロットオプション
+    bar_kw = {
+            'edgecolor':colors,
+            'fill':False,
+            'color':colors,
+            'linewidth':LINE_WIDTH,
+        }
+    err_kw = {
+            'yerr':errors,
+            'capsize':10,
+            'fmt':'none',
+            'ecolor':'k',
+        }
+    scatter_kw = {
+        'color':scatter_colors,
+        's':150
+        }
+    
+    if custom_kws is not None:
+       bar_kw = {**bar_kw, **custom_kws['bar_kw']} if 'bar_kw' in custom_kws else bar_kw
+       err_kw = {**err_kw, **custom_kws['err_kw']} if 'err_kw' in custom_kws else err_kw
+       scatter_kw = {**scatter_kw, **custom_kws['scatter_kw']} if 'scatter_kw' in custom_kws else scatter_kw
+    
+    ax.bar(bar_xs, aves, **bar_kw)
+    ax.errorbar(bar_xs, aves, **err_kw)
+    ax.scatter(scatter_xs, dataset, **scatter_kw)
     ax.set(xticks=bar_xs)
 
 def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:int, step:int) -> None:
@@ -83,9 +101,26 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
     
 if __name__ == '__main__':
-    for group, values in plt_params.items(): plt.rc(group, **values)
-    sample_dataset = np.random.rand(10, 100)
-    fig, ax = plt.subplots()
-    error_plot(sample_dataset, ax, colors='k', error_type='SE')
+    for group, values in rc_params.items(): plt.rc(group, **values)
+    sample_dataset = np.random.rand(2, 5)
+    names = ('data1', 'data2')
+    fig, axes = plt.subplots(1, 2)
+    error_plot(sample_dataset, axes[0], colors=['#ff7f00', 'b'], error_type='SE', scatter_shift_num=0.5, custom_kws={
+        'err_kw':{
+            'elinewidth':5,
+            'capthick':5
+        },
+        'bar_kw':{
+            'fill':True,
+            'width':1.
+        },
+        'scatter_kw':{
+            'edgecolor':'k',\
+            'linewidth':2
+        }
+    })
+    error_plot(sample_dataset, axes[1], colors=['#ff7f00', 'b'], error_type='SE')
+    for ax, title in zip(axes, ('custom', 'default')): ax.set(xticklabels=names, title=title)
+    fig.tight_layout()
     plt.show()
     
