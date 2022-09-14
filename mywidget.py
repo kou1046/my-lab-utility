@@ -25,9 +25,9 @@ class ScrollImageViewer(tk.Canvas):
         self._id = 0
         self.bind('<MouseWheel>',canvas_cmd,'+')
         if img_path_sequence is not None:
-            self.photos = [ImageTk.PhotoImage(image=Image.open(i)) for i in img_path_sequence]
+            self.photos = [ImageTk.PhotoImage(image=Image.open(i), master=self) for i in img_path_sequence]
         if img_sequence is not None:
-            self.photos = [ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(i,cv2.COLOR_BGR2RGB))) for i in img_sequence]
+            self.photos = [ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(i,cv2.COLOR_BGR2RGB)), master=self) for i in img_sequence]
         if self.photos:
             self._draw_canvas()
     def _draw_canvas(self):
@@ -36,7 +36,7 @@ class ScrollImageViewer(tk.Canvas):
             self.delete(self._id)
         self._id = self.create_image(0,0,anchor='nw',image=self.photos[self._index])
     def append_img_path(self,img_path:str):
-        self.photos.append(ImageTk.PhotoImage(image=Image.open(img_path)))
+        self.photos.append(ImageTk.PhotoImage(image=Image.open(img_path)), master=self)
         self.index = len(self.photos) - 1
     def append_img(self,img:np.ndarray):
         self.photos.append(ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))))
