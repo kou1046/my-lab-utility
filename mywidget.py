@@ -1,8 +1,32 @@
+from __future__ import annotations
 import tkinter as tk
-from typing import Sequence
+from typing import Sequence, TypeVar, Container, Callable
+from abc import ABCMeta, abstractmethod
 from PIL import ImageTk , Image
 import numpy as np
 import cv2
+
+Value = TypeVar('Value')
+class ContainerManager(tk.LabelFrame, metaclass=ABCMeta): #抽象クラス
+    def __init__(self, master, contents:Container[Value], receive_content_func:Callable[[Value], None], side:str='top', **kw): 
+        """
+        receive_content_funcに与えられる引数はcontents内の要素.
+        継承先の_create_content_widget内で作成したウィジェットのイベント(ボタンクリックなど)時に要素が渡される．
+        """
+        super().__init__(master, **kw)
+        self.contents:Container[Value] = contents
+        self.receive_content_func:Callable[[Value], None] = receive_content_func
+        self.side:str = side
+        self.update(side)       
+    def update(self): #クラスの外側やreceive_content_func内でcontentsを更新したときはこのメソッドを呼ぶとウィジェットが更新される
+        for widget in self.winfo_children():
+            widget.destroy()
+        for content in self.contents:
+            frame = tk.Frame(self)
+            self._create_content_widget(frame, content)
+            frame.pack(side=self.side)
+    @abstractmethod
+    def _create_content_widget(self, frame:tk.Frame, content:Value) -> None: ... #リストの中の表示するコンテンツの説明や操作ボタンをこの抽象メソッドで決める．
 
 class ScrollImageViewer(tk.Canvas):
     def __init__(self,master,img_path_sequence:Sequence[str]=None,img_sequence:Sequence[np.ndarray]=None,index:int=0,cnf={},**kw):
@@ -49,6 +73,36 @@ class ScrollImageViewer(tk.Canvas):
         return self._index
     @index.setter
     def index(self,value:int):
+        self._index = value
+        self._draw_canvas()
+        
+class LiveLoadScrollViewer(tk.Canvas):
+    def __init__(self, master, img_paths:Sequence[str], index:int=0, cnf={}, **kw):
+        super().__init__(master,cnf=cnf,**kw)
+        def canvas_cmd(e):
+            if e.delta > 0:
+                if self.index < len(self.img_paths)-1:
+                    self.index += 1
+            else:
+                if self.index > 0:
+                    self.index -= 1
+        self.img_paths:Sequence[str] = img_paths
+        self._index:int = index
+        self.id:int|None = None
+        self.photo:ImageTk.PhotoImage|None = None
+        self.bind('<MouseWheel>', canvas_cmd,'+')
+        self._draw_canvas()
+    def _draw_canvas(self):
+        if self.id is not None:
+            self.delete(self.id)
+        self.photo = ImageTk.PhotoImage(image=Image.open(self.img_paths[self.index]), master=self)
+        self['width'] , self['height'] = self.photo._PhotoImage__size
+        self.id = self.create_image(0,0,anchor='nw',image=self.photo)
+    @property
+    def index(self) -> int:
+        return self._index
+    @index.setter
+    def index(self, value:int):
         self._index = value
         self._draw_canvas()
     
