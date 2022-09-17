@@ -140,3 +140,9 @@ class ScrollFrame(tk.Frame):
     def pack(self,**kw):
         self._f.pack()
         super().pack(**kw)
+
+def color_change_hover(event):
+    if event.type == '7':
+        event.widget['bg'] = 'gray'
+    if event.type == '8':
+        event.widget['bg'] = 'SystemButtonFace'
