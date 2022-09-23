@@ -76,36 +76,19 @@ class ScrollImageViewer(tk.Canvas):
         self._index = value
         self._draw_canvas()
         
-class LiveLoadScrollViewer(tk.Canvas):
-    def __init__(self, master, img_paths:Sequence[str], index:int=0, cnf={}, **kw):
-        super().__init__(master,cnf=cnf,**kw)
-        def canvas_cmd(e):
-            if e.delta > 0:
-                if self.index < len(self.img_paths)-1:
-                    self.index += 1
-            else:
-                if self.index > 0:
-                    self.index -= 1
-        self.img_paths:Sequence[str] = img_paths
-        self._index:int = index
-        self.id:int|None = None
-        self.photo:ImageTk.PhotoImage|None = None
-        self.bind('<MouseWheel>', canvas_cmd,'+')
-        self._draw_canvas()
-    def _draw_canvas(self):
-        if self.id is not None:
-            self.delete(self.id)
-        self.photo = ImageTk.PhotoImage(image=Image.open(self.img_paths[self.index]), master=self)
-        self['width'] , self['height'] = self.photo._PhotoImage__size
-        self.id = self.create_image(0,0,anchor='nw',image=self.photo)
-    @property
-    def index(self) -> int:
-        return self._index
-    @index.setter
-    def index(self, value:int):
-        self._index = value
-        self._draw_canvas()
-    
+class ImageCanvas(tk.Canvas):
+    def __init__(self, master, **kw):
+        super().__init__(master, **kw)
+        self.img_id:int|None = None
+        self.photo:ImageTk.PhotoImage|None = None 
+        self.img:np.ndarray|None = None
+    def update_img(self, img:np.ndarray):
+        if self.photo is not None:
+            self.delete(self.img_id)
+        self.img = img
+        self.photo = ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), master=self)
+        self.img_id = self.create_image(0, 0, anchor='nw', image=self.photo)
+        
 class ScrollFrame(tk.Frame):
     def __init__(self,master,x=True,y=True,custom_width=0,custom_height=0,**kw):
         def _on_mousewheel(event):
