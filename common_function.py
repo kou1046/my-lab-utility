@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import ArtistAnimation, FuncAnimation
 from matplotlib.cm import ScalarMappable, get_cmap
+from matplotlib.colors import Normalize
 import os 
 import cv2
 from scipy import interpolate
 from typing import Generator
-from myplot import waterfall_plot
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from .myplot import waterfall_plot
 
 def STFT(array:np.ndarray,window_size:int,step:int,window_func=np.hamming) -> np.ndarray:
     result = []

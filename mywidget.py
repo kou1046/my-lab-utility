@@ -98,6 +98,8 @@ class ImageExtractor(tk.Tk):
         self.viewer.update_img(image)
         self.viewer.bind('<1>', lambda e:self._send_two_cor(e, self._extract_img))
         self.viewer.pack()
+        self.subviewer:ImageCanvas = ImageCanvas(self)
+        self.subviewer.pack()
         self.result:np.ndarray|None = None
     def _send_two_cor(self, e:tk.Event, send_func:Callable[[tuple[int, int]], None],
                       *, __clicked_cor:list[None|int]=[None]):
@@ -116,9 +118,12 @@ class ImageExtractor(tk.Tk):
         visualized_img = cv2.rectangle(img_copy, cor_1, cor_2, (0, 0, 0), 3)
         self.viewer.update_img(visualized_img)
         extracted_img = self.origin_img[ymin:ymax, xmin:xmax]
+        self.subviewer.update_img(extracted_img)
+        self.subviewer['height'], self.subviewer['width'], _ = extracted_img.shape
         if self.result is None:
             tk.Button(self, text='完了', command=self.destroy).pack()
         self.result = extracted_img
+       
         
 class ScrollFrame(tk.Frame):
     def __init__(self,master,x=True,y=True,custom_width=0,custom_height=0,**kw):
