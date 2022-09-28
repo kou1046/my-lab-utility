@@ -1,9 +1,12 @@
+from __future__ import annotations
 import numpy as np 
 import matplotlib.pyplot as plt
-from matplotlib.animation import ArtistAnimation
+from matplotlib.animation import ArtistAnimation, FuncAnimation
+from matplotlib.cm import ScalarMappable, get_cmap
 import os 
+import cv2
 from scipy import interpolate
-from typing import List
+from typing import Generator
 from myplot import waterfall_plot
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -41,7 +44,7 @@ def my_get_peakindex(array,num:int) -> np.ndarray:
         cnt = cnt + 1
     return np.array(result)
 
-def get_Rectangular_face(cors:List):
+def get_Rectangular_face(cors:list):
     cor_1  , cor_2 , cor_3 , cor_4 , cor_5 , cor_6 , cor_7 , cor_8 = cors
     vert_1 = np.array([cor_1] + [cor_2] + [cor_3] + [cor_4])
     vert_2 = np.array([cor_5] + [cor_6] + [cor_7] + [cor_8])
@@ -213,6 +216,43 @@ def moving_correlate_3d(array_1,array_2,times,window, axes=None, axes_3d=None, c
             ax_3_im_list = [axes[2].plot(times[:tau+1],MC,color)[0] for MC,color in zip(MC_array,colors)]
             ims.append([im]+[im_2]+ax_3_im_list)
     return (MC_array , ims) if axes_3d is not None or axes is not None else MC_array 
+
+def animateMatchTemplate(img:np.ndarray, extracted_img:np.ndarray, row_step:int=1, col_step:int=1,
+                         cmap='jet', method:int=cv2.TM_CCOEFF_NORMED) -> FuncAnimation:
+    
+    FrameType = tuple[int, int, np.ndarray, np.ndarray]
+    def update(frame:FrameType) -> None:
+        for ax in axes[1:]: ax.cla()
+        i, j, match, img  = frame
+        fig.suptitle(f'i={i}, j={j}')
+        axes[1].imshow(img)
+        axes[2].imshow(match, extent=[0, result_w, 0, result_h], vmin=min_value, vmax=max_value, cmap=cmap)
+        
+    def send_frames() -> Generator[tuple[int, int, np.ndarray], None, None]:
+        for i in range((height-fg_height)//col_step):
+            col_progress = i*col_step
+            for j in range((width-fg_width)//row_step): #横
+                row_progress = j*row_step
+                bg_img = img.copy()
+                bg_img[col_progress:col_progress+fg_height, row_progress:row_progress+fg_width] = extracted_img
+                result_anim[:col_progress+1, :row_progress+1] = result[:col_progress+1, :row_progress+1]
+                yield col_progress, row_progress, result_anim, bg_img
+
+    fig, axes = plt.subplots(3, 1)
+    cmap = get_cmap(cmap)
+    height, width, _ = img.shape
+    fg_height, fg_width, _ = extracted_img.shape
+    result = cv2.matchTemplate(img, extracted_img, method=method) #結果は先に計算
+    result_h, result_w = result.shape
+    min_value, max_value, _, max_idx = cv2.minMaxLoc(result)
+    result_anim = np.zeros((result.shape))
+    left_top_x, left_top_y = max_idx
+    axes[0].imshow(cv2.rectangle(img.copy(), (left_top_x, left_top_y), (left_top_x+fg_width, left_top_y+fg_height), (0, 0, 255), 3))
+    axes[0].set(xticks=[], yticks=[])
+    axes[2].set(xlim=[0, result_w], ylim=[0, result_h])
+    anim = FuncAnimation(fig, update, send_frames, interval=1)
+    fig.colorbar(ScalarMappable(cmap=cmap, norm=Normalize(vmin=min_value, vmax=max_value)), orientation='horizontal')
+    return anim
 
 if __name__ == '__main__':
     N = 256
