@@ -80,11 +80,18 @@ class ScrollImageViewer(tk.LabelFrame, metaclass=ABCMeta):
     def img_len(self) -> int: ...
     
 class LiveLoadingViewer(ScrollImageViewer):
-    def __init__(self, master:tk.Widget, img_paths:Sequence[str], **kw):
+    def __init__(self, master:tk.Widget, img_paths:Sequence[str], 
+                 add_drawing_func:None|Callable[[np.ndarray, int], np.ndarray]=None,
+                 **kw):
         self.img_paths:Sequence[str] = img_paths
+        self.add_drawing_func:None|Callable[[np.ndarray, int], np.ndarray] = add_drawing_func
         super().__init__(master, **kw)
     @property
-    def img(self) -> np.ndarray: return cv2.imread(self.img_paths[self.index])
+    def img(self) -> np.ndarray:
+        if self.add_drawing_func is None:
+            return cv2.imread(self.img_paths[self.index])
+        else:
+            return self.add_drawing_func(cv2.imread(self.img_paths[self.index]), self.index)
     @property
     def img_len(self) -> int: return len(self.img_paths)
     
@@ -110,7 +117,7 @@ class ViewOptionSelector(tk.LabelFrame):
         def skip_cmd(e:tk.Event):
             self.skip = int(skip_entry.get())
         jump_area = tk.Frame(self)
-        tk.Label(jump_area, text='jump').pack()
+        tk.Label(jump_area, text=f'jump (1~{self.master.img_len})').pack()
         jump_entry = tk.Entry(jump_area, justify='center')
         jump_entry.bind('<Return>', jump_cmd)
         skip_area = tk.Frame(self)
@@ -197,6 +204,7 @@ def color_change_hover(event):
         event.widget['bg'] = 'SystemButtonFace'
         
 if __name__ == '__main__':
+        
     base_dir = filedialog.askdirectory()
     img_paths = glob(os.path.join(base_dir, '*.jpg'))
     assert img_paths
