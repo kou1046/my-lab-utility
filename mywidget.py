@@ -1,5 +1,9 @@
 from __future__ import annotations
+from glob import glob
+import os
 import tkinter as tk
+from tkinter import filedialog
+from tkinter.ttk import LabelFrame
 from typing import Sequence, TypeVar, Container, Callable
 from abc import ABCMeta, abstractmethod
 from PIL import ImageTk , Image
@@ -28,54 +32,6 @@ class ContainerManager(tk.LabelFrame, metaclass=ABCMeta): #抽象クラス
     @abstractmethod
     def _create_content_widget(self, frame:tk.Frame, content:Value) -> None: ... #リストの中の表示するコンテンツの説明や操作ボタンをこの抽象メソッドで決める．
 
-class ScrollImageViewer(tk.Canvas):
-    def __init__(self,master,img_path_sequence:Sequence[str]=None,img_sequence:Sequence[np.ndarray]=None,index:int=0,cnf={},**kw):
-        super().__init__(master,cnf=cnf,**kw)
-        def canvas_cmd(e):
-            if not self.photos:
-                return
-            if e.delta > 0:
-                if self._index < len(self.photos)-1:
-                    self._index += 1
-                    self.delete(self._id)
-                    self._draw_canvas()
-            else:
-                if self._index > 0:
-                    self._index -= 1
-                    self.delete(self._id)
-                    self._draw_canvas()
-        self.photos = []
-        self._index = index
-        self._id = 0
-        self.bind('<MouseWheel>',canvas_cmd,'+')
-        if img_path_sequence is not None:
-            self.photos = [ImageTk.PhotoImage(image=Image.open(i), master=self) for i in img_path_sequence]
-        if img_sequence is not None:
-            self.photos = [ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(i,cv2.COLOR_BGR2RGB)), master=self) for i in img_sequence]
-        if self.photos:
-            self._draw_canvas()
-    def _draw_canvas(self):
-        self['width'] , self['height'] = self.photos[self._index]._PhotoImage__size
-        if not self._id:
-            self.delete(self._id)
-        self._id = self.create_image(0,0,anchor='nw',image=self.photos[self._index])
-    def append_img_path(self,img_path:str):
-        self.photos.append(ImageTk.PhotoImage(image=Image.open(img_path)), master=self)
-        self.index = len(self.photos) - 1
-    def append_img(self,img:np.ndarray):
-        self.photos.append(ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(img,cv2.COLOR_BGR2RGB))))
-        self.index = len(self.photos) - 1
-    def del_img(self, index:int):
-        del self.photos[index]
-        self.index = (index - 1) if index > 0 else index + 1
-    @property
-    def index(self):
-        return self._index
-    @index.setter
-    def index(self,value:int):
-        self._index = value
-        self._draw_canvas()
-        
 class ImageCanvas(tk.Canvas):
     def __init__(self, master, **kw):
         super().__init__(master, **kw)
@@ -88,7 +44,82 @@ class ImageCanvas(tk.Canvas):
         self.img = img
         self.photo = ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), master=self)
         self.img_id = self.create_image(0, 0, anchor='nw', image=self.photo)
-
+        self['height'], self['width'], _ = img.shape
+        
+class ScrollImageViewer(tk.LabelFrame, metaclass=ABCMeta):
+    def __init__(self, master:tk.Widget, **kw):
+        super().__init__(master, **kw)
+        self.viewer = ImageCanvas(self)
+        self.option = ViewOptionSelector(self, text='option')
+        self.viewer.bind('<MouseWheel>', self._viewer_cmd)
+        self.index:int = 0
+        self._update()
+        for w in (self.option, self.viewer): w.pack()
+    def _viewer_cmd(self, e:tk.Widget) -> None:
+        if e.delta > 0:
+            if (self.index + self.option.skip) >= self.img_len:
+                self.index = self.img_len - 1
+            else:
+                self.index += self.option.skip
+        else:
+            if (self.index - self.option.skip) <= 0:
+                self.index = 0
+            else:
+                self.index -= self.option.skip
+        self._update()
+    def _update(self):
+        self.viewer.update_img(self.img)
+        self['text'] = str(self.num)
+    @property
+    def num(self) -> int: return self.index + 1
+    @property
+    @abstractmethod
+    def img(self) -> np.ndarray: ...
+    @property
+    @abstractmethod
+    def img_len(self) -> int: ...
+    
+class LiveLoadingViewer(ScrollImageViewer):
+    def __init__(self, master:tk.Widget, img_paths:Sequence[str], **kw):
+        self.img_paths:Sequence[str] = img_paths
+        super().__init__(master, **kw)
+    @property
+    def img(self) -> np.ndarray: return cv2.imread(self.img_paths[self.index])
+    @property
+    def img_len(self) -> int: return len(self.img_paths)
+    
+class CompletedLoadingViewer(ScrollImageViewer):
+    def __init__(self, master:tk.Widget, imgs:Sequence[np.ndarray], **kw):
+        self.imgs:Sequence[np.ndarray] = imgs
+        super().__init__(master, **kw)
+    @property
+    def img(self) -> np.ndarray: return self.imgs[self.index]
+    @property
+    def img_len(self) -> int: return len(self.imgs)
+    
+class ViewOptionSelector(tk.LabelFrame):
+    def __init__(self, master:ScrollImageViewer, **kw):
+        super().__init__(master, **kw)
+        self.master:ScrollImageViewer
+        self.skip:int = 1
+        self._create_widget()
+    def _create_widget(self) -> None:
+        def jump_cmd(e:tk.Event):
+            self.master.index = int(jump_entry.get()) - 1
+            self.master._update()
+        def skip_cmd(e:tk.Event):
+            self.skip = int(skip_entry.get())
+        jump_area = tk.Frame(self)
+        tk.Label(jump_area, text='jump').pack()
+        jump_entry = tk.Entry(jump_area, justify='center')
+        jump_entry.bind('<Return>', jump_cmd)
+        skip_area = tk.Frame(self)
+        tk.Label(skip_area, text='skip').pack()
+        skip_entry = tk.Entry(skip_area, justify='center')
+        skip_entry.bind('<Return>', skip_cmd)
+        for w in (jump_entry, skip_entry): (w.insert(0, str(1)), w.pack())
+        for w in (jump_area, skip_area): w.pack(side=tk.LEFT)
+        
 class ImageExtractor(tk.Tk):
     def __init__(self, image:np.ndarray, **kw):
         super().__init__(**kw)
@@ -124,7 +155,6 @@ class ImageExtractor(tk.Tk):
             tk.Button(self, text='完了', command=self.destroy).pack()
         self.result = extracted_img
        
-        
 class ScrollFrame(tk.Frame):
     def __init__(self,master,x=True,y=True,custom_width=0,custom_height=0,**kw):
         def _on_mousewheel(event):
@@ -165,3 +195,20 @@ def color_change_hover(event):
         event.widget['bg'] = 'gray'
     if event.type == '8':
         event.widget['bg'] = 'SystemButtonFace'
+        
+if __name__ == '__main__':
+    base_dir = filedialog.askdirectory()
+    img_paths = glob(os.path.join(base_dir, '*.jpg'))
+    assert img_paths
+    win = tk.Tk()
+    viewer = LiveLoadingViewer(win, img_paths).pack()
+    
+    """"
+    ↑　or 
+    viewer = CompletedLoadingViewer(win, [cv2.imread(path) for path in img_paths]).pack()
+    """
+    
+    win.mainloop()
+    
+    
+    
