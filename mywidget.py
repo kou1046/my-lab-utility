@@ -3,7 +3,6 @@ from glob import glob
 import os
 import tkinter as tk
 from tkinter import filedialog
-from tkinter.ttk import LabelFrame
 from typing import Sequence, TypeVar, Container, Callable
 from abc import ABCMeta, abstractmethod
 from PIL import ImageTk , Image
@@ -103,6 +102,7 @@ class CompletedLoadingViewer(ScrollImageViewer):
     def img(self) -> np.ndarray: return self.imgs[self.index]
     @property
     def img_len(self) -> int: return len(self.imgs)
+    
     
 class ViewOptionSelector(tk.LabelFrame):
     def __init__(self, master:ScrollImageViewer, **kw):

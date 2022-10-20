@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
-import mywidget
+from .mywidget import ScrollImageViewer
 import tkinter as tk
 import requests 
 from bs4 import BeautifulSoup
@@ -74,7 +74,7 @@ class ImageDownloader:
         def btn_cmd(e, folder_:NamedImageFolder) -> None:
             sub_win = tk.Toplevel(win)
             title_f = tk.LabelFrame(sub_win, text=folder_.name)
-            viewer = mywidget.ScrollImageViewer(title_f, img_sequence=[img.img for img in folder_.imgs])
+            viewer = ScrollImageViewer(title_f, img_sequence=[img.img for img in folder_.imgs])
             del_btn = tk.Button(title_f, text='消去',command=lambda:[folder_.pop_img(viewer.index), viewer.del_img(viewer.index)])
             del_btn.pack()
             viewer.pack()
