@@ -1,1 +1,1 @@
-from scripts.mycommon import mywidget, myplot, common_function, downloader
+from packages.mycommon import mywidget, myplot, common_function, downloader
