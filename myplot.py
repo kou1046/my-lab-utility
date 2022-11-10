@@ -19,7 +19,8 @@ rc_params = {
     'axes':{
             'spines.right':False,
             'spines.top':False,
-            'linewidth':LINE_WIDTH
+            'linewidth':LINE_WIDTH,
+            'labelweight':'bold'
         },
     'xtick':{
         'major.width':LINE_WIDTH,
