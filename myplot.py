@@ -1,6 +1,8 @@
 from __future__ import annotations
 from msilib import sequence
 import matplotlib.pyplot as plt 
+from matplotlib.collections import PathCollection
+from sklearn.neighbors import KernelDensity
 from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
@@ -129,3 +131,35 @@ if __name__ == '__main__':
     fig.tight_layout()
     plt.show()
     
+def join_hist(scats:list[PathCollection], bins:int=100, kernel=False):
+    fig = scats[0].get_figure()
+    fig.clf()
+    gs = fig.add_gridspec(2, 2,  width_ratios=(8, 1), height_ratios=(1, 8),)
+    hist_x = fig.add_subplot(gs[0, 0:-1])
+    hist_y = fig.add_subplot(gs[1:, -1])
+    kde_x_ax = hist_x.twinx(); kde_y_ax = hist_y.twiny()
+    scatter = fig.add_subplot(gs[1:, 0:-1], )
+    for scat in scats:
+        data = np.array(scat.get_offsets())
+        x = data[:, 0]; y = data[:, 1]
+        scatter.scatter(x, y)
+        if kernel:
+            kde_x = KernelDensity(kernel='gaussian', bandwidth=1).fit(x[:, None])
+            kde_y = KernelDensity(kernel='gaussian', bandwidth=1).fit(y[:, None])
+            dens_x = np.linspace(*scatter.get_xlim(), 500)[:, None]
+            dens_y = np.linspace(*scatter.get_ylim(), 500)[:, None]
+            kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)))
+            kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)), dens_y)
+        else:
+            hist_x.hist(x, bins=bins, alpha=0.7); hist_y.hist(y, bins=bins, orientation='horizontal', alpha=0.7)
+    for ax in (hist_x, hist_y, kde_x_ax, kde_y_ax):
+        for direction in ('right', 'top', 'left', 'bottom'):
+            ax.spines[direction].set_visible(False)
+            ax.tick_params(**{direction:False, f'label{direction}':False})
+    for ax in (hist_x, kde_x_ax):
+        ax.set(xlim=scatter.get_xlim())
+        ax.spines['bottom'].set_visible(True)
+    for ax in (hist_y, kde_y_ax):
+        ax.set(ylim=scatter.get_ylim())
+        ax.spines['left'].set_visible(True)
+    fig.subplots_adjust(hspace=0.05, wspace=0.05)
