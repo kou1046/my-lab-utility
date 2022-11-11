@@ -7,32 +7,36 @@ from typing import Any, Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import PolyCollection
 import itertools
+import matplotlib.patches as mpatches
+from matplotlib.path import Path
 
-LINE_WIDTH = 5
-rc_params = {
-    'figure':{
-        'figsize':(19.20,10.80)
-    },
-    'font':{
-            'family':'Arial',
-            'size':45,
-            'weight':'bold',
+def get_my_rcparams(linewidth:int=5, major_size=15) -> dict[str, dict[str, Any]]:
+    rc_params = {
+        'figure':{
+            'figsize':(15, 15),
+            'subplot.left':0.15,
         },
-    'axes':{
-            'spines.right':False,
-            'spines.top':False,
-            'linewidth':LINE_WIDTH,
-            'labelweight':'bold'
+        'font':{
+                'family':'Arial',
+                'size':45,
+                'weight':'bold',
+            },
+        'axes':{
+                'spines.right':False,
+                'spines.top':False,
+                'linewidth':linewidth,
+                'labelweight':'bold'
+            },
+        'xtick':{
+            'major.width':linewidth,
+            'major.size':major_size
         },
-    'xtick':{
-        'major.width':LINE_WIDTH,
-        'major.size':15
-    },
-    'ytick':{
-        'major.width':LINE_WIDTH,
-        'major.size':15
+        'ytick':{
+            'major.width':linewidth,
+            'major.size':major_size
+        }
     }
-}
+    return rc_params
 
 T = TypeVar('T', int, float)
 def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
@@ -77,13 +81,13 @@ def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[st
             'edgecolor':colors,
             'fill':False,
             'color':colors,
-            'linewidth':LINE_WIDTH,
+            'linewidth':5,
         }
     err_kw = {
             'yerr':errors,
             'capsize':10,
             'capthick':5,
-            'elinewidth':LINE_WIDTH,
+            'elinewidth':5,
             'fmt':'none',
             'ecolor':'k',
         }
@@ -109,49 +113,77 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     X , Y = np.meshgrid(time_mesh,freq_mesh)
     Z = array.T
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
+
+def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
+                 colors:Sequence[str]| str | None=None,  labels:Sequence[str] | None = None,
+                 kernel=False,  hist_kw:dict[str, Any] | None=None, scatter_kw:dict[str, Any] | None=None):
+    """
+    ヒストグラム付きの散布図．内部で figure インスタンスを作成し, figと[散布図, x方向ヒストグラム, y方向ヒストグラム]のaxesを返す.
     
-if __name__ == '__main__':
-    for group, values in rc_params.items(): plt.rc(group, **values)
-    sample_dataset = np.random.rand(2, 15)
-    fig, axes = plt.subplots(1, 2)
-    error_plot(sample_dataset, axes[0], colors='k', error_type='SE', scatter_shift_nums=0.5, custom_kws={
-        'bar_kw':{
-            'hatch':['//', '**']
-        },
-        'scatter_kw':{
-            'edgecolor':'k',
-            'linewidth':2
-        },
-        'err_kw':{
-            'capsize':50
-        }
-    })
-    error_plot(sample_dataset, axes[1], error_type='SE')
-    for ax, title in zip(axes, ('custom', 'default')): ax.set(title=title, xlabel='data±SE', xticklabels=('data1', 'data2'))
-    fig.tight_layout()
+    xs, ys : データの配列 (行数:ラベルの数, 列数: データの数)
+    colors : データの行数と等しい文字配列または文字列
+    labels : データの行数と等しいラベルの文字配列
+    kernel : True でカーネル密度推定を描画
+    hist_kw : ヒストグラムに渡したいオプション
+    scatter_kw : 散布図に渡したいオプション
+    
+    Example: 
+    x = np.random.rand(100); y = np.random.rand(100)
+    x_2 = np.random.rand(100); y_2 = np.random.rand(100)
+    
+    xs = [x, x_2]; ys = [y, y_2]
+    colors = ['k', 'r']
+    hist_kw = {
+        'bins':100,
+        'alpha':0.4
+    }
+    scatter_kw = {
+        's':100, 
+        'edgecolor':'w'
+    }
+    fig, ax = scatter_hist(xs, ys, colors, ['Negative', 'Positive'], True, hist_kw, scatter_kw)
+    ax.set(xlabel='x', ylabel='y', )
+    plt.legend(bbox_to_anchor=(1., 1.05), fontsize=24, loc='lower left')
     plt.show()
+    """
+    hist_default_kw = {
+        'bins':100, 
+        'alpha':0.6,
+    }
     
-def join_hist(scats:list[PathCollection], bins:int=100, kernel=False):
-    fig = scats[0].get_figure()
-    fig.clf()
+    scatter_default_kw = {
+        
+    }
+    
+    if hist_kw is not None:
+        hist_kw = {**hist_default_kw, **hist_default_kw}
+    else:
+        hist_kw = hist_default_kw
+    if scatter_kw is not None:
+        scatter_kw = {**scatter_default_kw, **scatter_kw}
+    else:
+        scatter_kw = scatter_default_kw
+    
+    fig = plt.figure()
     gs = fig.add_gridspec(2, 2,  width_ratios=(8, 1), height_ratios=(1, 8),)
     hist_x = fig.add_subplot(gs[0, 0:-1])
     hist_y = fig.add_subplot(gs[1:, -1])
     kde_x_ax = hist_x.twinx(); kde_y_ax = hist_y.twiny()
-    scatter = fig.add_subplot(gs[1:, 0:-1], )
-    for scat in scats:
-        data = np.array(scat.get_offsets())
-        x = data[:, 0]; y = data[:, 1]
-        scatter.scatter(x, y)
+    scatter = fig.add_subplot(gs[1:, 0:-1])
+    if colors is None or isinstance(colors, str):
+        colors = [colors] * len(xs)
+    if labels is None:
+        labels = [labels] * len(xs)
+    for x, y, color, label in zip(xs, ys, colors, labels):
+        scatter.scatter(x, y, label=label, c=color, **scatter_kw)
         if kernel:
-            kde_x = KernelDensity(kernel='gaussian', bandwidth=1).fit(x[:, None])
-            kde_y = KernelDensity(kernel='gaussian', bandwidth=1).fit(y[:, None])
+            kde_x = KernelDensity(kernel='gaussian', bandwidth=0.8).fit(x[:, None])
+            kde_y = KernelDensity(kernel='gaussian', bandwidth=0.8).fit(y[:, None])
             dens_x = np.linspace(*scatter.get_xlim(), 500)[:, None]
             dens_y = np.linspace(*scatter.get_ylim(), 500)[:, None]
-            kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)))
-            kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)), dens_y)
-        else:
-            hist_x.hist(x, bins=bins, alpha=0.7); hist_y.hist(y, bins=bins, orientation='horizontal', alpha=0.7)
+            kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)), linewidth=3, color=color,)
+            kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)), dens_y, linewidth=3, color=color,)
+        hist_x.hist(x, color=color, **hist_kw); hist_y.hist(y, orientation='horizontal', color=color, **hist_kw)
     for ax in (hist_x, hist_y, kde_x_ax, kde_y_ax):
         for direction in ('right', 'top', 'left', 'bottom'):
             ax.spines[direction].set_visible(False)
@@ -163,3 +195,77 @@ def join_hist(scats:list[PathCollection], bins:int=100, kernel=False):
         ax.set(ylim=scatter.get_ylim())
         ax.spines['left'].set_visible(True)
     fig.subplots_adjust(hspace=0.05, wspace=0.05)
+    axes = [scatter, hist_x, hist_y]
+    return fig, axes
+
+def abbreviated_plot(xs:Sequence[Sequence], ys:Sequence[Sequence],
+                     interrupt_x:float | int, reopen_x:float | int, 
+                     colors:Sequence[str]| str | None=None,  labels:Sequence[str] | None = None,
+                     plot_kw:dict[str, Any] | None = None):
+        """":
+        x軸を途中省略した折れ線グラフを描画する.内部で figure インスタンスを作成し, figと[前半のデータ, 後半]のaxesを返す.
+        
+        xs, ys : データの配列 (行数:ラベルの数, 列数: データの数)
+        interrupt_x:省略開始地点のX
+        reopen_x:省略後のx
+        colors : データの行数と等しい文字配列または文字列
+        labels : データの行数と等しいラベルの文字配列
+        plot_kw : プロット描画時に渡したいオプション引数
+        
+        Example:
+        xs = np.linspace(1, 1000, 1000); ys = np.linspace(1, 1000, 1000)
+        plot_kw = {'lw':3, 'linestyle':'--'}
+        fig, axes = abbreviated_plot([xs], [ys], 305, 800, colors=['k'], labels=['test'], plot_kw=plot_kw)
+        axes[1].set(xticks=[1000])
+        plt.legend()
+        plt.show()
+        """
+        plot_default_kw = {
+        }
+        
+        if plot_kw is not None:
+            plot_kw = {**plot_default_kw, **plot_kw}
+        else:
+            plot_kw = plot_default_kw
+        
+        fig, axes = plt.subplots(ncols=2, sharey='row', width_ratios=(2, 1))
+        axes[1].tick_params(left=False, labelleft=False)
+        over_y = 0.01; height = 0.05; wnum = 35 #奇数
+        pp = (0, height,0, -height)
+        px = np.array([pp[i%4] for i in range(0, wnum)])
+        py = np.linspace(-1*over_y, 1+over_y, wnum)
+        p = Path(list(zip(px, py)), [Path.MOVETO]+[Path.CURVE3]*(wnum-1))
+        
+        line1 = mpatches.PathPatch(p, lw=13, edgecolor='black',
+                              facecolor='None', clip_on=False,
+                              transform=axes[1].transAxes, zorder=10)
+        line2 = mpatches.PathPatch(p,lw=8, edgecolor='white',
+                                   facecolor='None', clip_on=False,
+                                   transform=axes[1].transAxes, zorder=10,
+                                   capstyle='round')
+        axes[1].add_patch(line1)
+        axes[1].add_patch(line2)
+        axes[1].spines['left'].set_visible(False)
+        axes[1].tick_params(left=False, labelleft=False)
+        if colors is None or isinstance(colors, str):
+            colors = [colors] * len(xs)
+        if labels is None:
+            labels = [labels] * len(xs)
+        for i, (x, y ,color, label) in enumerate(zip(xs, ys, colors, labels)):
+            for ax in axes: ax.plot(x, y, color=color, label=label, **plot_kw)
+            xmin, xmax = axes[0].get_xlim()
+            axes[0].set(xlim=[xmin, interrupt_x])
+            if i == 0:
+                axes[1].set(xlim=[reopen_x, xmax])
+        fig.subplots_adjust(wspace=0.00)
+        return fig, axes
+    
+if __name__ == '__main__':
+    
+    xs = np.linspace(1, 1000, 1000); ys = np.linspace(1, 1000, 1000)
+    plot_kw = {'lw':3, 'linestyle':'--'}
+    fig, axes = abbreviated_plot([xs], [ys], 305, 800, colors=['k'], labels=['test'], plot_kw=plot_kw)
+    axes[1].set(xticks=[1000])
+    plt.legend()
+    plt.show()
+    
