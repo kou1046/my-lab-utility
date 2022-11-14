@@ -29,11 +29,14 @@ def get_my_rcparams(linewidth:int=5, major_size=15) -> dict[str, dict[str, Any]]
             },
         'xtick':{
             'major.width':linewidth,
-            'major.size':major_size
+            'major.size':major_size,
         },
         'ytick':{
             'major.width':linewidth,
-            'major.size':major_size
+            'major.size':major_size,
+        },
+        'legend':{
+            'fancybox':False,
         }
     }
     return rc_params
@@ -115,7 +118,7 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
 
 def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
-                 colors:Sequence[str]| str | None=None,  labels:Sequence[str] | None = None,
+                 colors:Sequence[str]| str | None=None,  labels:Sequence[str] | None = None, ratio:int=8, 
                  kernel=False,  hist_kw:dict[str, Any] | None=None, scatter_kw:dict[str, Any] | None=None):
     """
     ヒストグラム付きの散布図．内部で figure インスタンスを作成し, figと[散布図, x方向ヒストグラム, y方向ヒストグラム]のaxesを返す.
@@ -124,6 +127,7 @@ def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
     colors : データの行数と等しい文字配列または文字列
     labels : データの行数と等しいラベルの文字配列
     kernel : True でカーネル密度推定を描画
+    ratio : 散布図のとヒストグラムの大きさ比率 (散布図 : ヒストグラム = ratio : 1)
     hist_kw : ヒストグラムに渡したいオプション
     scatter_kw : 散布図に渡したいオプション
     
@@ -165,7 +169,7 @@ def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
         scatter_kw = scatter_default_kw
     
     fig = plt.figure()
-    gs = fig.add_gridspec(2, 2,  width_ratios=(8, 1), height_ratios=(1, 8),)
+    gs = fig.add_gridspec(2, 2,  width_ratios=(ratio, 1), height_ratios=(1, ratio),)
     hist_x = fig.add_subplot(gs[0, 0:-1])
     hist_y = fig.add_subplot(gs[1:, -1])
     kde_x_ax = hist_x.twinx(); kde_y_ax = hist_y.twiny()

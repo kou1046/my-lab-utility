@@ -7,7 +7,7 @@ from matplotlib.colors import Normalize
 import os 
 import cv2
 from scipy import interpolate
-from typing import Generator
+from typing import Generator, Iterator
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from .myplot import waterfall_plot
 
@@ -255,6 +255,39 @@ def animateMatchTemplate(img:np.ndarray, extracted_img:np.ndarray, row_step:int=
     fig.colorbar(ScalarMappable(cmap=cmap, norm=Normalize(vmin=min_value, vmax=max_value)), orientation='horizontal')
     return anim
 
+def central_idxes_gen(container_size:int, win_num:int) -> Generator[Iterator[int], None, None]: 
+    """
+    中央を基準とした窓の計算に用いる．イテレート毎に移動するインデックス群のイテレータを返すジェネレータ．
+    最初は前方のインデックス群，　最後は後方のインデックス群を返す．
+    
+    container_size:データのサイズ
+    win_num:s左右の窓の幅. 例えばwin_num = 1を指定すると, 左, 中央, 右の3つのインデックスを返す. 
+    
+    Example:
+    x = np.linspace(0, 1, 100); y = np.sin(2*np.pi*x) + np.random.rand(100)
+    gen = central_idxes_gen(100, 3)
+    moving_aves = []
+    for _ in x:
+        moving_aves.append(np.average([y[i] for i in next(gen)]))
+    plt.plot(x, y)
+    plt.plot(x, moving_aves)
+    plt.show()
+    """
+    
+    index = 0
+    while True:
+        if index < win_num:
+            sample_nums = range(index, index + (win_num*2+1))
+        elif index + win_num >= container_size:
+            sample_nums = range(index - win_num*2, index+1)
+        else:
+            sample_nums = list(range(index-win_num, index)) + list(range(index, index + (win_num+1)))
+        yield iter(sample_nums)
+        index += 1
+        if index == container_size:
+            index = 0
+            return 
+        
 if __name__ == '__main__':
     N = 256
     window = 64
