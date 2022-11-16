@@ -10,7 +10,7 @@ import itertools
 import matplotlib.patches as mpatches
 from matplotlib.path import Path
 
-def get_my_rcparams(linewidth:int=5, major_size=15) -> dict[str, dict[str, Any]]:
+def get_my_rcparams(linewidth:int=5, major_size=20) -> dict[str, dict[str, Any]]:
     rc_params = {
         'figure':{
             'figsize':(15, 15),
@@ -30,10 +30,14 @@ def get_my_rcparams(linewidth:int=5, major_size=15) -> dict[str, dict[str, Any]]
         'xtick':{
             'major.width':linewidth,
             'major.size':major_size,
+            'major.pad':12,
+            'direction':'in'
         },
         'ytick':{
             'major.width':linewidth,
             'major.size':major_size,
+            'direction':'in',
+            'major.pad':12,
         },
         'legend':{
             'fancybox':False,
@@ -117,19 +121,23 @@ def plot_3d_spectrogram(ax_3d, array:np.ndarray, N:int, fs:float, window_size:in
     Z = array.T
     ax_3d.plot_surface(X,Y,Z,cmap='terrain')
 
-def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
+def scatter_hist(xs:Sequence[Sequence[int | float]], ys:Sequence[Sequence[int | float]],
                  colors:Sequence[str]| str | None=None,  labels:Sequence[str] | None = None, ratio:int=8, 
-                 kernel=False,  hist_kw:dict[str, Any] | None=None, scatter_kw:dict[str, Any] | None=None):
+                 kernel:bool | str=False, bandwidth:float | int = 5., kernel_kw:dict[str, Any] = None,
+                 hist_kw:dict[str, Any] | None=None, scatter_kw:dict[str, Any] | None=None):
     """
     ヒストグラム付きの散布図．内部で figure インスタンスを作成し, figと[散布図, x方向ヒストグラム, y方向ヒストグラム]のaxesを返す.
     
     xs, ys : データの配列 (行数:ラベルの数, 列数: データの数)
     colors : データの行数と等しい文字配列または文字列
     labels : データの行数と等しいラベルの文字配列
-    kernel : True でカーネル密度推定を描画
-    ratio : 散布図のとヒストグラムの大きさ比率 (散布図 : ヒストグラム = ratio : 1)
-    hist_kw : ヒストグラムに渡したいオプション
-    scatter_kw : 散布図に渡したいオプション
+    ratio : 散布図とヒストグラムの比率 (散布図のサイズ:ヒストグラムのサイズ = ratio : 1)
+    kernel : True でカーネル密度推定を描画 'both'を渡すとヒストグラムと重ねて描画
+    bandwidth : カーネル密度推定のバンド幅
+    kernel_kw : カーネル密度推定の描画に渡したいオプション
+    hist_kw : ヒストグラムの描画に渡したいオプション
+    scatter_kw : 散布図の描画に渡したいオプション
+    
     
     Example: 
     x = np.random.rand(100); y = np.random.rand(100)
@@ -152,21 +160,28 @@ def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
     """
     hist_default_kw = {
         'bins':100, 
-        'alpha':0.6,
+        'alpha':0.4,
     }
     
     scatter_default_kw = {
         
     }
     
+    kernel_default_kw = {
+    }
+    
     if hist_kw is not None:
-        hist_kw = {**hist_default_kw, **hist_default_kw}
+        hist_kw = {**hist_default_kw, **hist_kw}
     else:
         hist_kw = hist_default_kw
     if scatter_kw is not None:
         scatter_kw = {**scatter_default_kw, **scatter_kw}
     else:
         scatter_kw = scatter_default_kw
+    if kernel_kw is not None:
+        kernel_kw = {**kernel_default_kw, **kernel_kw}
+    else:
+        kernel_kw = kernel_default_kw
     
     fig = plt.figure()
     gs = fig.add_gridspec(2, 2,  width_ratios=(ratio, 1), height_ratios=(1, ratio),)
@@ -179,15 +194,18 @@ def scatter_hist(xs:Sequence[np.ndarray], ys:Sequence[np.ndarray],
     if labels is None:
         labels = [labels] * len(xs)
     for x, y, color, label in zip(xs, ys, colors, labels):
+        x:np.ndarray = np.array(x)
+        y:np.ndarray = np.array(y)
         scatter.scatter(x, y, label=label, c=color, **scatter_kw)
         if kernel:
-            kde_x = KernelDensity(kernel='gaussian', bandwidth=0.8).fit(x[:, None])
-            kde_y = KernelDensity(kernel='gaussian', bandwidth=0.8).fit(y[:, None])
+            kde_x = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(np.array(x)[:, None])
+            kde_y = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(np.array(y)[:, None])
             dens_x = np.linspace(*scatter.get_xlim(), 500)[:, None]
             dens_y = np.linspace(*scatter.get_ylim(), 500)[:, None]
-            kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)), linewidth=3, color=color,)
-            kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)), dens_y, linewidth=3, color=color,)
-        hist_x.hist(x, color=color, **hist_kw); hist_y.hist(y, orientation='horizontal', color=color, **hist_kw)
+            kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)) * x.shape[0], color=color, **kernel_kw)
+            kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)) * x.shape[0], dens_y, color=color, **kernel_kw)
+        if not kernel or kernel == 'both':
+            hist_x.hist(x, color=color, **hist_kw); hist_y.hist(y, orientation='horizontal', color=color, **hist_kw)
     for ax in (hist_x, hist_y, kde_x_ax, kde_y_ax):
         for direction in ('right', 'top', 'left', 'bottom'):
             ax.spines[direction].set_visible(False)
