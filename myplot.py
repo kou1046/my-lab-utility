@@ -70,7 +70,32 @@ def waterfall_plot(ax_3d, dim_2_array:np.ndarray, extent:tuple[T, T, T, T],
 
 KwsType = dict[Literal['bar_kw', 'err_kw', 'scatter_kw'], dict[str, Any]]
 def error_plot(dataset:Sequence[Sequence[int|float]], ax, colors:str|Sequence[str]='k', scatter_shift_nums:float|Sequence[float]=0.1, 
-                error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None: #datasetの次元に注意．行の数だけ棒グラフが描画される．
+                error_type:Literal['SD', 'SE']='SD', custom_kws:Optional[KwsType]=None) -> None: #datasetの次元に注意．
+    """
+    各データの平均棒グラフ，散布図，エラーバーを同時に描画する．
+    
+    Example:
+    for group, values in rc_params.items(): plt.rc(group, **values)
+    sample_dataset = np.random.rand(2, 15)
+    fig, axes = plt.subplots(1, 2)
+    error_plot(sample_dataset, axes[0], colors='k', error_type='SE', scatter_shift_nums=0.5, custom_kws={
+        'bar_kw':{
+            'hatch':['//', '**']
+        },
+        'scatter_kw':{
+            'edgecolor':'k',
+            'linewidth':2
+        },
+        'err_kw':{
+            'capsize':50
+        }
+    })
+    error_plot(sample_dataset, axes[1], error_type='SE')
+    for ax, title in zip(axes, ('custom', 'default')): ax.set(title=title, xlabel='data±SE', xticklabels=('data1', 'data2'))
+    fig.tight_layout()
+    plt.show()
+    """
+    
     flat = itertools.chain.from_iterable
     row_num = len(dataset); col_nums = [len(arr) for arr in dataset] #行ごとの列の数
     if isinstance(scatter_shift_nums, float): 
