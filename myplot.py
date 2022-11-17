@@ -193,6 +193,10 @@ def scatter_hist(xs:Sequence[Sequence[int | float]], ys:Sequence[Sequence[int | 
         colors = [colors] * len(xs)
     if labels is None:
         labels = [labels] * len(xs)
+    flat_x = [el for x in xs for el in x]
+    flat_y = [el for y in ys for el in y]
+    xmin, xmax = min(flat_x), max(flat_x)
+    ymin, ymax = min(flat_y), max(flat_y)
     for x, y, color, label in zip(xs, ys, colors, labels):
         x:np.ndarray = np.array(x)
         y:np.ndarray = np.array(y)
@@ -200,8 +204,8 @@ def scatter_hist(xs:Sequence[Sequence[int | float]], ys:Sequence[Sequence[int | 
         if kernel:
             kde_x = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(np.array(x)[:, None])
             kde_y = KernelDensity(kernel='gaussian', bandwidth=bandwidth).fit(np.array(y)[:, None])
-            dens_x = np.linspace(*scatter.get_xlim(), 500)[:, None]
-            dens_y = np.linspace(*scatter.get_ylim(), 500)[:, None]
+            dens_x = np.linspace(xmin, xmax, 500)[:, None]
+            dens_y = np.linspace(ymin, ymax, 500)[:, None]
             kde_x_ax.plot(dens_x, np.exp(kde_x.score_samples(dens_x)) * x.shape[0], color=color, **kernel_kw)
             kde_y_ax.plot(np.exp(kde_y.score_samples(dens_y)) * x.shape[0], dens_y, color=color, **kernel_kw)
         if not kernel or kernel == 'both':
