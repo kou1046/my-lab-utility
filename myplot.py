@@ -22,6 +22,7 @@ def get_my_rcparams(linewidth:int=5, major_size=20) -> dict[str, dict[str, Any]]
                 'weight':'bold',
             },
         'axes':{
+                'titleweight':'bold',
                 'spines.right':False,
                 'spines.top':False,
                 'linewidth':linewidth,
@@ -41,6 +42,7 @@ def get_my_rcparams(linewidth:int=5, major_size=20) -> dict[str, dict[str, Any]]
         },
         'legend':{
             'fancybox':False,
+            'markerscale':2.
         }
     }
     return rc_params
