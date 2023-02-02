@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pickle
 from typing import Generator, Iterator, Literal, TypeVar
 
 import cv2
@@ -272,6 +273,30 @@ def moving_correlate(
             )
             ims.append(im + im_2 + im_3 + [im_4])
     return (MC, ims) if animation_axes is not None else MC
+
+
+def checkpoint(path: str = "checkpoint.pickle"):
+    """_summary_
+    関数の返り値をバイナリデータ形式でキャッシュする．キャッシュ保存(読み込み)先を引数に渡す．デコレータとして使える．
+    Args:
+        path (str, optional): Cache storage path. Defaults to "checkpoint.pickle".
+
+    """
+
+    def _checkpoint(func):
+        def __checkpoint(*args, **kwargs):
+            if os.path.exists(path):
+                with open(path, "rb") as f:
+                    ret = pickle.load(f)
+            else:
+                ret = func(*args, **kwargs)
+                with open(path, "wb") as f:
+                    pickle.dump(ret, f)
+            return ret
+
+        return __checkpoint
+
+    return _checkpoint
 
 
 def moving_correlate_3d(
