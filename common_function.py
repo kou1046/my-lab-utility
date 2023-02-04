@@ -254,7 +254,7 @@ def moving_correlate(
         else:
             result = (
                 np.corrcoef(tmp_f, tmp_g)[0][1]
-                if len(times - 1) >= tau + window
+                if len(times) - 1 >= tau + window
                 else np.nan
             )
         MC.append(result)
@@ -302,6 +302,10 @@ def checkpoint(path: str = "checkpoint.pickle"):
 def moving_correlate_3d(
     array_1, array_2, times, window, axes=None, axes_3d=None, colors=None
 ):
+    if not isinstance(array_1, np.ndarray):
+        array_1 = np.array(array_1)
+    if not isinstance(array_2, np.ndarray):
+        array_2 = np.array(array_2)
     if axes_3d is not None:
         waterfall_plot(axes_3d[0], array_1, extent=[0, times[-1], 0, len(array_1)])
         waterfall_plot(axes_3d[0], array_2, extent=[0, times[-1], 0, len(array_1)])
@@ -313,20 +317,20 @@ def moving_correlate_3d(
     dt = times[1] - times[0]
     D, N = array_1.shape
     F = array_1.copy()
+    F_mean = F.mean(axis=1, keepdims=True)
     G = array_2.copy()
+    G_mean = G.mean(axis=1, keepdims=True)
     MC_array = []
     ims = []
     for tau in range(N - 1):
         tmp_F = F[:, tau : tau + window]
         tmp_G = G[:, tau : tau + window]
-        tmp_F_mean = tmp_F.mean(axis=1).reshape(-1, 1)
-        tmp_G_mean = tmp_G.mean(axis=1).reshape(-1, 1)
-        result = np.sum((tmp_F - tmp_F_mean) * (tmp_G - tmp_G_mean), axis=1).reshape(
+        result = np.sum((tmp_F - F_mean) * (tmp_G - G_mean), axis=1).reshape(
             -1, 1
         ) / np.sum(
             (
-                np.linalg.norm(tmp_F - tmp_F_mean, axis=1).reshape(-1, 1)
-                * np.linalg.norm(tmp_G - tmp_G_mean, axis=1).reshape(-1, 1)
+                np.linalg.norm(tmp_F - F_mean, axis=1).reshape(-1, 1)
+                * np.linalg.norm(tmp_G - G_mean, axis=1).reshape(-1, 1)
             ),
             axis=1,
         ).reshape(
