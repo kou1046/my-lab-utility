@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import pickle
-from typing import Generator, Iterator, Literal, TypeVar
+from typing import Generator, Iterator, Literal, Sequence, TypeVar
 
 import cv2
 import matplotlib.pyplot as plt
@@ -176,7 +176,7 @@ def save_STAC_animation(
         [array[i * step : i * step + window] for i in range(window_len)]
     )
     for i, arr in enumerate(split_array):
-        fig, axes = plt.subplots(3, 1)
+        fig, axes = plt.subplots(3, 1, sharex=Tr)
         axes[0].set_title(f"Data window{i+1}")
         for j, arr_ in enumerate(split_array):
             axes[0].plot(
@@ -188,7 +188,7 @@ def save_STAC_animation(
         axes[0].set_xlim(axes[1].get_xlim())
         axes[0].set_xlabel("Time [sec]")
         axes[1].set_xlabel("Time [sec]")
-        axes[2].set_title("Convolution result")
+        axes[2].set_title("Correlation result")
         axes[2].set_xlabel("Lag [sec]")
         plt.tight_layout()
         anim = ArtistAnimation(fig, ims, interval=10)
@@ -199,8 +199,16 @@ def save_STAC_animation(
 
 
 def STAC(
-    times: np.ndarray, array: np.ndarray, window_size: int, step: int, normalize=False
+    times: Sequence[float | int],
+    array: Sequence[float | int],
+    window_size: int,
+    step: int,
+    normalize=False,
 ) -> np.ndarray:
+    if not isinstance(times, np.ndarray):
+        times = np.array(times)
+    if not isinstance(array, np.ndarray):
+        array = np.array(array)
     result = []
     step = step
     for i in range((len(array) - window_size) // step):
@@ -381,11 +389,13 @@ def moving_correlate_3d(
                 times[tau],
                 times[tau + window if len(times) - 1 >= tau + window else -1],
                 color="lightgray",
+                alpha=0.7,
             )
             im_2 = axes[1].axvspan(
                 times[tau],
                 times[tau + window if len(times) - 1 >= tau + window else -1],
                 color="lightgray",
+                alpha=0.7,
             )
             ax_3_im_list = [
                 axes[2].plot(times[: tau + 1], MC, color)[0]
