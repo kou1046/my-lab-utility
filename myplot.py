@@ -105,6 +105,7 @@ KwsType = dict[Literal["bar_kw", "err_kw", "scatter_kw"], dict[str, Any]]
 def error_plot(
     dataset: Sequence[Sequence[int | float]],
     ax,
+    bar_xs: Sequence[int] | None = None,
     colors: str | Sequence[str] = "k",
     scatter_shift_nums: float | Sequence[float] = 0.1,
     error_type: Literal["SD", "SE"] = "SD",
@@ -134,13 +135,20 @@ def error_plot(
     fig.tight_layout()
     plt.show()
     """
-
-    flat = itertools.chain.from_iterable
     row_num = len(dataset)
     col_nums = [len(arr) for arr in dataset]  # 行ごとの列の数
-    if isinstance(scatter_shift_nums, float):
+    flat = itertools.chain.from_iterable
+
+    if not isinstance(scatter_shift_nums, float):
+        assert len(dataset) == len(scatter_shift_nums)
+    else:
         scatter_shift_nums = [scatter_shift_nums] * row_num  # キャスト
-    bar_xs = range(row_num)
+
+    if bar_xs is None:
+        bar_xs = range(row_num)
+    else:
+        assert len(bar_xs) == row_num
+
     scatter_xs = tuple(
         flat(
             [
@@ -170,11 +178,12 @@ def error_plot(
     }
     err_kw = {
         "yerr": errors,
-        "capsize": 10,
-        "capthick": 5,
-        "elinewidth": 5,
+        "capsize": 0,
+        "capthick": 8,
+        "elinewidth": 8,
         "fmt": "none",
         "ecolor": "k",
+        "lolims": True,
     }
     scatter_kw = {"color": scatter_colors, "s": 150}
 
@@ -193,9 +202,11 @@ def error_plot(
         )
 
     ax.bar(bar_xs, aves, **bar_kw)
-    ax.errorbar(bar_xs, aves, **err_kw)
+    plotline, caplines, barlinecols = ax.errorbar(bar_xs, aves, **err_kw)
     ax.scatter(scatter_xs, tuple(flat(dataset)), **scatter_kw)
     ax.set(xticks=bar_xs)
+    caplines[0].set_marker("_")
+    caplines[0].set_markersize(25)
 
 
 def plot_3d_spectrogram(
